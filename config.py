@@ -1,6 +1,7 @@
 from decouple import config
 from telethon.sync import TelegramClient
 
+
 class var:
     # Mandatory
     API_ID = config("API_ID", cast=int, default=6)
@@ -12,6 +13,7 @@ class var:
     # Optional
     BOT_LOGGING = config("BOT_LOGGING", cast=bool, default=False)
     LOG_CHANNEL = config("LOG_CHANNEL", cast=int, default=0)
-    PREFIXES = config("PREFIXES", cast=list, default=["/"])
+    PREFIXES = config("PREFIXES", cast=lambda v: v.split(), default="/")
+
 
 bot = TelegramClient("TGBot", var.API_ID, var.API_HASH).start(bot_token=var.BOT_TOKEN)

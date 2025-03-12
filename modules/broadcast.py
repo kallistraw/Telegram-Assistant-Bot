@@ -1,28 +1,32 @@
-from telethon import events
-from . import (
-    bot,
-    var,
-    BotDB,
-    log,
-    )
+from . import tgbot_cmd, BotDB, bot, var, log
 
-@bot.on(events.NewMessage(pattern="/broadcast"))
-async def broadcast(event):
-    if event.sender_id not in BotDB.get("ADMINS"):
-        return await event.reply("⚠️ You don't have permission to use this command.")
 
+@tgbot_cmd(command="broadcast")
+async def broadcast(event, args):
     reply = await event.get_reply_message()
-    args = event.text.split(maxsplit=1)
-    if not reply and len(args) < 2:
-        return await event.reply("Usage: `/broadcast Your message here` or reply to a message")
+    if not (reply and args):
+        return await event.reply(
+            f"Usage:\n`{i}broadcast Your message here` or reply to a message"
+        )
 
-    message = reply if reply else args[1]
+    message = reply if reply else args
     users = BotDB.get_users()
+    total = 0
+    suc = 0
 
     for user_id in users:
+        total += 1
         try:
             await bot.send_message(user_id, message)
+            suc += 1
         except Exception as e:
             log.error(f"Failed to send message to {user_id}: {e}")
 
-    await event.reply(f"Broadcast send to {len(users)} users!")
+    return await event.reply(
+        f"Total users: {total} users.\nMessage sent to {suc} users.\nFailed to send to {total - suc} users."
+    )
+
+
+@tgbot_cmd(command="bc")
+async def bc(event, args):
+    return await broadcast(event, args)
