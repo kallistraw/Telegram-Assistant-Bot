@@ -1,4 +1,8 @@
-from . import tgbot_cmd, BotDB, bot, var, log
+from . import bot
+from . import BotDB
+from . import log
+from . import tgbot_cmd
+from . import var
 
 
 @tgbot_cmd(command="broadcast")

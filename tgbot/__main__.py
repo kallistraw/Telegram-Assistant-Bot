@@ -1,13 +1,14 @@
-from .misc.configs import bot, var
-from .utils import loader, logger
-from telethon import events
+import asyncio
+
+from . import *
+from .utils.helper import load_modules
 
 
 async def main():
-    loader.load_modules()  # Load all modules
-    logger.log.info("🤖 Bot is running...")
-    await bot.run_until_disconnected()
+    LOGS.info("Initializing...")
+    load_modules()
+    await bot.run()
 
 
-with bot:
-    bot.loop.run_until_complete(main())
+if __name__ == "__main__":
+    asyncio.run(main())
