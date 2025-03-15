@@ -1,3 +1,5 @@
+"""This module contain the Python-Telegram-Bot's Application wrapper."""
+
 import asyncio
 import traceback
 from functools import wraps
@@ -5,17 +7,16 @@ from logging import Logger
 
 from telegram.ext import Application
 from telegram.ext import CallbackQueryHandler
-from telegram.ext import CommandHandler
 from telegram.ext import filters
 from telegram.ext import InlineQueryHandler
-from telegram.ext import MessageFilter
 from telegram.ext import MessageHandler
 
-from . import *
+from .. import DB
 from .. import Var
+from ..utils import LOGS
 
 
-class PrefixCommandFilter(MessageFilter):
+class PrefixCommandFilter:
     """
     Message filtering for `on_cmd` to support multiple prefixes and filters.
     """
@@ -32,7 +33,7 @@ class PrefixCommandFilter(MessageFilter):
 
         for prefix in self.prefixes:
             if text.startswith(prefix):
-                cmd = text[len(prefix) :].split()[0]
+                cmd = text[len(prefix)].split()[0]
                 if cmd in self.commands:
                     return self.extra_filter(message) if self.extra_filter else True
 
@@ -44,7 +45,7 @@ class Client:
     A very simple PTB client wrapper with Pyrogram-style decorators.
     """
 
-    def __init__(self, token, log_channel=None, logger: Logger = LOGS, *args, **kwargs):
+    def __init__(self, token, log_channel=None, logger: Logger = LOGS, **kwargs):
         """
         Initializes the bot with the given token.
 
@@ -69,12 +70,13 @@ class Client:
             self.logger.info("Starting bot client...")
             await self.application.initialize()
             await self.application.start()
-        except:
+        except BaseException as e:
             self.logger.error(
                 "The bot token is expired or invalid"
                 "get a new one from @BotFather and add it at .env file in BOT_TOKEN!"
             )
-            import sys
+            self.logger.error(e)
+            import sys  # pylint: disable=import-outside-toplevel
 
             sys.exit()
 
@@ -119,7 +121,6 @@ class Client:
         owner_only=False,
         dev_only=False,
         *args,
-        **kwargs,
     ):
         """
         Decorator for handling commands.
@@ -138,7 +139,7 @@ class Client:
             - Additionally, you can pass `telegram.ext.filters` here.
         """
         commands = commands or []
-        prefixes = prefixes or BotDB.get_key("PREFIXES") or Var("PREFIXES")
+        prefixes = prefixes or DB.get("PREFIXES") or Var("PREFIXES")
 
         def dynamic_filter(update):
             extra_filter = args[0] if args else None
@@ -154,9 +155,9 @@ class Client:
                 )
 
             if dev_only:
-                DEVS = BotDB.get_key("DEVS")
-                if DEVS:
-                    devs = [int(x) for x in DEVS]
+                get_devs = DB.get("DEVS")
+                if get_devs:
+                    devs = [int(x) for x in get_devs]
                     owner = int(Var("OWNER_ID"))
                     devs.append(owner)
                     dev_filter = filters.User(devs)

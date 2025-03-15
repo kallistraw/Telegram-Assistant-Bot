@@ -7,7 +7,7 @@ repos:
       - id: check-yaml
       - id: check-docstring-first
       - id: requirements-txt-fixer
-      - id: double-quote-string-fixer
+#      - id: double-quote-string-fixer
   - repo: https://github.com/psf/black
     rev: 25.1.0
     hooks:
@@ -20,12 +20,17 @@ repos:
 #    rev: v3.3.5
 #    hooks:
 #      - id: pylint
+#        additional_dependencies:
+#          - python-decouple
+#          - python-telegram-bot
+#        args: ["--disable=broad-exception-caught"]
 #  - repo: https://github.com/asottile/reorder-python-imports
 #    rev: v3.14.0
 #    hooks:
 #      - id: reorder-python-imports
-#  - repo: https://github.com/asottile/pyupgrade
-#    rev: v3.19.1
+#  - repo: https://github.com/astral-sh/ruff-pre-commit
+#    rev: v0.4.1
 #    hooks:
-#      - id: pyupgrade
-#        args: [--py39-plus]
+#      - id: ruff
+#        args: ["--fix", "--verbose"]
+#      - id: ruff-format

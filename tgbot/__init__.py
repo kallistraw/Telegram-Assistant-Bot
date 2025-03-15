@@ -1,39 +1,59 @@
 ###
+"""
+This module contains global configurations, variables, and commonly used imports.
+"""
 import os
-import time
-from logging import basicConfig
-from logging import FileHandler
-from logging import getLogger
-from logging import INFO
-from logging import StreamHandler
+import sys
 
-from .config import *
-from .utils.wrapper import *
+_is_module = __package__ in sys.argv or sys.argv[0] == "-m"
 
-__version__ = "0.0.1-build"
+if _is_module:
+    import time
 
-Var = ConfigVars()
+    # Misc
+    from .config import ConfigVars
 
-channel_id = Var("LOG_CHANNEL") if Var("LOG_CHANNEL") else None
-bot = Client(Var("BOT_TOKEN"), log_channel=channel_id)
+    # Utility imports
+    from .utils import LOGS
 
-filename = time.strftime("%Y-%m-%d.log")
-if os.path.isfile(filename):
-    os.remove(filename)
+    # Core imports
+    from .core import Client
+    from .core import BotDB
 
-_FMT = "%(asctime)s | %(name)s [%(levelname)s] : %(message)s"
-basicConfig(
-    level=INFO,
-    format=_FMT,
-    datefmt="%H:%M:%S",
-    handlers=[FileHandler(filename), StreamHandler()],
-)
+    # Version
+    from .version import __version__ as __tgbot__
+    from telegram.version import __version__ as __ptb__
 
-LOGS = getLogger("BotLogger")
+    if not os.path.exists("./modules"):
+        TEXT = (
+            "'modules' directory not found!\n"
+            "Make sure that you are on the correct path"
+        )
+        LOGS.error(TEXT)
+        sys.exit()
 
-try:
-    import coloredlogs
+    # Configuriable... (is that a word?)
+    StartTime = time.time()
+    DB = BotDB()
+    Var = ConfigVars()
 
-    coloredlogs.install(level=None, logger=LOGS, fmt=_FMT)
-except ImportError:
-    pass
+    # To store some stuff that isn't necesarilly need to be stored in the database
+    _tgbot_cache: dict[str, any | None] = {}
+
+    LOGS.info("Initializing connection with %s...", DB.name)
+    if DB.ping():
+        LOGS.info("Connected to %s!", DB.name)
+
+    if not Var("BOT_TOKEN"):
+        LOGS.error("'BOT_TOKEN' Not found! Please fill it in '.env' file first.")
+        sys.exit()
+
+    channel_id = Var("LOG_CHANNEL") or DB.get("LOG_CHANNEL") or None
+    print(channel_id)
+    Bot = Client(Var("BOT_TOKEN"), log_channel=channel_id)
+
+else:
+    from logging import getLogger
+
+    LOGS = getLogger("BotLogger")
+    Bot = DB = None  # pylint: disable=invalid-name
