@@ -173,8 +173,10 @@ cython_debug/
 # Telegram Sessions
 *.session
 
-# SQLite3
+# SQLite
 *.db
 
-# My To-Do list
-to-do.*
+# pre-commit stuff
+.pre-comit-config.yaml
+.flake8
+.isort.cfg
