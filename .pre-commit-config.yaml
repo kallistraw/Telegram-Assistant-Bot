@@ -3,19 +3,34 @@ repos:
     rev: v5.0.0
     hooks:
       - id: trailing-whitespace
+        exclude: "^(tests/|migrations/|venv/)"
       - id: end-of-file-fixer
+        exclude: "^(tests/|migrations/|venv/)"
       - id: check-yaml
+        exclude: "^(tests/|migrations/|venv/)"
       - id: check-docstring-first
+        exclude: "^(tests/|migrations/|venv/)"
       - id: requirements-txt-fixer
-#      - id: double-quote-string-fixer
+        exclude: "^(tests/|migrations/|venv/)"
+
   - repo: https://github.com/psf/black
     rev: 25.1.0
     hooks:
       - id: black
+        exclude: "^(tests/|migrations/|venv/)"
+
   - repo: https://github.com/PyCQA/flake8
     rev: 7.1.2
     hooks:
       - id: flake8
+        exclude: "^(tests/|migrations/|venv/)"
+
+  - repo: https://github.com/pycqa/isort
+    rev: 5.13.2
+    hooks:
+      - id: isort
+        exclude: "^(tests/|migrations/|venv/)"
+
 #  - repo: https://github.com/PyCQA/pylint
 #    rev: v3.3.5
 #    hooks:
@@ -23,7 +38,10 @@ repos:
 #        additional_dependencies:
 #          - python-decouple
 #          - python-telegram-bot
-#        args: ["--disable=broad-exception-caught"]
+#          - humanize
+#        args: ["--disable=broad-exception-caught", "--jobs=4"]
+#        exclude: "^(tests/|migrations/|venv/)"
+#
 #  - repo: https://github.com/asottile/reorder-python-imports
 #    rev: v3.14.0
 #    hooks:

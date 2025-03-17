@@ -1,16 +1,13 @@
 """This module serves as the main entry point."""
 
 import asyncio
-import os
-import time
 
+import tgbot
 
-async def main():
-    """The main function to update the source, load modules, and start the bot"""
-    # pylint: disable=import-outside-toplevel
-    from tgbot import DB, Bot, StartTime
-    from tgbot.utils import LOGS
-    from tgbot.utils.helpers import load_modules
+def main():
+    from .core import DB
+    from .utils import LOGS
+    from .utils.helper import load_modules
 
     # Update the bot (if any) when restarting.
     if DB.get_key("UPDATE_ON_RESTART") and os.path.exists(".git"):

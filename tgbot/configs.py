@@ -41,3 +41,15 @@ class ConfigVars:
 
     def __repr__(self):
         return "<ConfigVars>"
+
+
+# Lazy initialization
+_VAR_INSTANCE = None
+
+
+def get_var():
+    """Returns the configuration instance."""
+    global _VAR_INSTANCE  # pylint: disable=global-statement
+    if _VAR_INSTANCE is None:
+        _VAR_INSTANCE = ConfigVars()
+    return _VAR_INSTANCE

@@ -1,22 +1,29 @@
 """This module contain the Python-Telegram-Bot's Application wrapper."""
 
 import asyncio
-import traceback
 from functools import wraps
 from logging import Logger
+import traceback
 
-from telegram.ext import Application
-from telegram.ext import CallbackQueryHandler
-from telegram.ext import filters
-from telegram.ext import InlineQueryHandler
-from telegram.ext import MessageHandler
+from telegram.ext import (
+    Application,
+    CallbackQueryHandler,
+    InlineQueryHandler,
+    MessageHandler,
+    filters,
+)
 
-from .. import DB
-from .. import Var
-from ..utils import LOGS
+from tgbot.configs import get_var
+from tgbot.core.database import bot_db
+from tgbot.utils import LOGS
+
+__all__ = ("Client",)
+
+Var = get_var()
+DB = bot_db()
 
 
-class PrefixCommandFilter:
+class _PrefixCommandFilter:  # pylint: disable=too-few-public-methods
     """
     Message filtering for `on_cmd` to support multiple prefixes and filters.
     """
@@ -45,14 +52,7 @@ class Client:
     A very simple PTB client wrapper with Pyrogram-style decorators.
     """
 
-    def __init__(self, token, log_channel=None, logger: Logger = LOGS, **kwargs):
-        """
-        Initializes the bot with the given token.
-
-        Args:
-            token (str): Telegram bot token.
-            log_channel (int): Telegram group ID where errors will be logged.
-        """
+    def __init__(self, token: str, log_channel: int = None, logger: Logger = LOGS):
         self._cache: dict[str, str | None] = {}
         self.application = Application.builder().token(token).build()
         self.log_channel = log_channel
@@ -60,7 +60,12 @@ class Client:
         self.bot_info = None
         self.logger = logger
 
-        asyncio.create_task(self._async_init())
+        # Check for an existing event loop
+        try:
+            loop = asyncio.get_running_loop()
+            loop.create_task(self._async_init())
+        except RuntimeError:
+            asyncio.run(self._async_init())
 
     async def _async_init(self):
         """
@@ -82,7 +87,7 @@ class Client:
 
         self.bot_info = await self.bot.get_me()
         me = self.bot_info
-        self.logger.info(f"Bot started! Username: @{me.username}, ID: {me.id}")
+        self.logger.info("Bot started! Username: @%s, ID: %s", me.username, me.id)
 
     def __repr__(self):
         name = f"@{self.bot_info.username}" if self.bot_info else "Unknown"
@@ -109,8 +114,7 @@ class Client:
                     await context.bot.send_message(
                         self.log_channel, error_message, parse_mode="Markdown"
                     )
-                else:
-                    self.logger.error(error_message)
+                self.logger.error(error_message)
 
         return wrapper
 
@@ -125,15 +129,15 @@ class Client:
         """
         Decorator for handling commands.
         Args:
-            commands (str | list[str]):
-              -Command names (e.g., 'start' or ['ping', 'p'])
-            prefixes (str | list[str]):
-              - Allowed prefixes (e.g., '/' or ['/', '!'], default = '/')
-            group_only (bool):
+            commands (:obj:`str` | :obj:`list[str]`):
+              -Command names (e.g., `'start'` or `['ping', 'p']`)
+            prefixes (:obj:`str` | :obj:`list[str]`):
+              - Allowed prefixes (e.g., `'/'` or `['/', '!']`, default = `'/'`)
+            group_only (:obj:`bool`):
               - If set to True, commands will only works in groups.
-            owner_only (bool):
+            owner_only (:obj:`bool`):
               - If set to True, commands will only works for the bot's owner.
-            dev_only (boo):
+            dev_only (:obj:`bool`):
               - If set to True, commands will only works for the bot's owner and devs.
               - Check the help message for `auth` command for more info.
             - Additionally, you can pass `telegram.ext.filters` here.
@@ -174,8 +178,10 @@ class Client:
         def decorator(func):
             wrapped_func = self.error_handler(func)
 
-            command_filter = PrefixCommandFilter(
-                commands, prefixes, filters.create(dynamic_filter)
+            command_filter = _PrefixCommandFilter(
+                commands,
+                prefixes,
+                filters.create(dynamic_filter),  # pylint: disable=no-member
             )
 
             self.application.add_handler(

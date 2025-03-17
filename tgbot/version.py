@@ -1,7 +1,6 @@
 """This module contains the versionìng of the bot."""
 
-from typing import Final
-from typing import NamedTuple
+from typing import Final, NamedTuple
 
 
 class Version(NamedTuple):
@@ -14,7 +13,7 @@ class Version(NamedTuple):
 
     major: int
     minor: int
-    patch: int
+    micro: int
     stage: str
     date: str | None
     prn: int
@@ -28,8 +27,8 @@ class Version(NamedTuple):
 
     def __str__(self) -> str:
         version = f"{self.major}.{self.minor}"
-        if self.patch != 0:
-            version = f"{version}.{self.patch}"
+        if self.micro != 0:
+            version = f"{version}.{self.micro}"
         if self.stage != "final":
             version = f"{version}{self._shorthand()}{self.prn}"
 
@@ -37,7 +36,9 @@ class Version(NamedTuple):
 
 
 __version__: Final[Version] = Version(
-    major=0, minor=0, patch=1, stage="alpha", date="3/04/2025", prn=1
+    major=0, minor=0, micro=1, stage="alpha", date="3/04/2025", prn=1
 )
 
-__all__ = "__version__"
+__all__ = [
+    "__version__",
+]

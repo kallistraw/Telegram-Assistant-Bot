@@ -175,8 +175,3 @@ cython_debug/
 
 # SQLite
 *.db
-
-# pre-commit stuff
-.pre-comit-config.yaml
-.flake8
-.isort.cfg

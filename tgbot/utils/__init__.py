@@ -1,18 +1,15 @@
 """This module contains utility functions"""
 
+from logging import INFO, FileHandler, StreamHandler, basicConfig, getLogger
 import os
 import time
-from logging import basicConfig
-from logging import FileHandler
-from logging import getLogger
-from logging import INFO
-from logging import StreamHandler
-
-from .helpers import is_dangerous
-from .helpers import load_modules
 
 # Logger
-log_file = time.strftime("%Y-%m-%d.log")
+log_file = time.strftime("tg-bot.log")
+
+# Don't know if this is a good idea or not...
+# Basically, everytime the bot restart,
+# will delete and create a new log file to keep it small and clean
 if os.path.isfile(log_file):
     os.remove(log_file)
 
@@ -33,4 +30,6 @@ try:
 except ImportError:
     pass
 
-__all__ = ("is_dangerous", "load_modules", "log_file", "LOGS")
+__all__ = [
+    "LOGS",
+]

@@ -1,6 +1,6 @@
 """This module contains the essential functions."""
 
 from ._client import Client
-from ._database import BotDB
+from .database import bot_db
 
-__all__ = ("Client", "BotDB")
+__all__ = ("Client", "bot_db")
