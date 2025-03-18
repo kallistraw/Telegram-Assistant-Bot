@@ -31,17 +31,17 @@ repos:
       - id: isort
         exclude: "^(tests/|migrations/|venv/)"
 
-#  - repo: https://github.com/PyCQA/pylint
-#    rev: v3.3.5
-#    hooks:
-#      - id: pylint
-#        additional_dependencies:
-#          - python-decouple
-#          - python-telegram-bot
-#          - humanize
-#        args: ["--disable=broad-exception-caught", "--jobs=4"]
-#        exclude: "^(tests/|migrations/|venv/)"
-#
+  - repo: https://github.com/PyCQA/pylint
+    rev: v3.3.5
+    hooks:
+      - id: pylint
+        additional_dependencies:
+          - python-decouple
+          - python-telegram-bot
+          - humanize
+        args: ["--disable=broad-exception-caught", "--jobs=4"]
+        exclude: "^(tests/|migrations/|venv/)"
+
 #  - repo: https://github.com/asottile/reorder-python-imports
 #    rev: v3.14.0
 #    hooks:

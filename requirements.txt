@@ -1,0 +1,3 @@
+humanize
+python-decouple
+python-telegram-bot

@@ -1,11 +1,10 @@
 """This module serves as the main entry point."""
 
-import asyncio
 import os
 import time
 
 
-async def main():
+def main():
     """The main function to update the source, load modules, and start the bot"""
     # pylint: disable=import-outside-toplevel
     from tgbot import DB, Bot, StartTime
@@ -14,7 +13,7 @@ async def main():
 
     # Update the bot (if any) when restarting.
     if DB.get_key("UPDATE_ON_RESTART") and os.path.exists(".git"):
-        pass  # TODO
+        pass
 
     LOGS.info("Initializing...")
 
@@ -31,12 +30,12 @@ async def main():
 
     # Send deploy message to Telegram if 'NO_LOG_MSG' hasn't been set yet or is False
     if not _no_log or _no_log.lower() != "true":
-        pass  # TODO
+        pass
 
     LOGS.info(_time_taken)
     LOGS.info(_success)
-    await Bot.run()
+    Bot.run()
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()
