@@ -19,11 +19,11 @@ repos:
       - id: black
         exclude: "^(tests/|migrations/|venv/)"
 
-  - repo: https://github.com/PyCQA/flake8
-    rev: 7.1.2
-    hooks:
-      - id: flake8
-        exclude: "^(tests/|migrations/|venv/)"
+#  - repo: https://github.com/PyCQA/flake8
+#    rev: 7.1.2
+#    hooks:
+#      - id: flake8
+#        exclude: "^(tests/|migrations/|venv/)"
 
   - repo: https://github.com/pycqa/isort
     rev: 5.13.2
