@@ -1,3 +1,10 @@
+# Multi functional Telegram assistant bot.
+# Copyright (c) 2025, Kallistra <kallistraw@gmail.com>
+#
+# This file is a part of <https://github.com/kallistraw/Telegram-Bot-Assistant>
+# and is released under the "BSD-3-Clause License". Please read the full license in
+# <https://github.com/kallistraw/Telegram-Assistant-Bot/blob/main/LICENSE>
+# pylint: disable=missing-function-docstring
 """This module contains some helper functions."""
 
 import importlib
@@ -21,34 +28,44 @@ _bot_cache: dict[str | int, any] = {}
 class TempCache:
     """Caching logic that can handle different data types."""
 
-    def __init__(self, cache_dict=None):
+    def __init__(self, cache_dict: dict[str | int, any] = None) -> None:
         """
         Initialize with an external dictionary (or create a new one if None).
+
+        Arguments:
+            cache_dict (:obj:`dict`):
+                A dictionary to use as a temporary cache storage.
         """
         self.cache = cache_dict if cache_dict is not None else {}
 
-    def set(self, key: str | int, value: any):
+    def set(self, key: str | int, value: any) -> bool:
         """Set a value in the cache."""
         self.cache[key] = value
+        return True
 
-    def get(self, key: str | int, default: str = None):
+    def get(self, key: str | int, default=None) -> any:
         """Retrieve a value from the cache."""
         return self.cache.get(key, default)
 
-    def delete(self, key: str):
+    def delete(self, key: str) -> bool:
         """Delete a key from the cache."""
+        if key not in self.cache:
+            LOGS.error("No such key: %s", key)
+            return False
         self.cache.pop(key, None)
+        return True
 
     # Data type handler #
     @property
     def list(self):
-        """Handling lists."""
 
         class ListWrapper:
-            def __init__(self, parent):
+            """Handling lists."""  # Hehe...
+
+            def __init__(self, parent) -> None:
                 self.parent = parent
 
-            def set(self, key: str | int, value: any):
+            def set(self, key: str | int, value: any) -> bool:
                 """Set or extend a value to a list in the cache."""
                 if key not in self.parent.cache:
                     self.parent.cache[key] = []
@@ -59,8 +76,9 @@ class TempCache:
                     )
                 elif value not in self.parent.cache[key]:
                     self.parent.cache[key].append(value)
+                return True
 
-            def delete(self, key: str | int, value: any):
+            def delete(self, key: str | int, value: any) -> bool:
                 """Remove a value from a list in the cache."""
                 if key in self.parent.cache and isinstance(
                     self.parent.cache[key], list
@@ -68,21 +86,25 @@ class TempCache:
                     try:
                         self.parent.cache[key].remove(value)
                         if not self.parent.cache[key]:
-                            del self.parent.cache[key]
+                            del self.parent.cache[key]  # Remove empty list
+                            return True
+                        return True
                     except ValueError:
-                        pass  # Ignore if value is not in the list
+                        return False
+                return False
 
         return ListWrapper(self)
 
     @property
     def dict(self):
-        """Handling dictionaries."""
 
         class DictWrapper:
-            def __init__(self, parent):
+            """Handling dictionaries."""  # Hehe(2)...
+
+            def __init__(self, parent) -> bool:
                 self.parent = parent
 
-            def set(self, dict_key: str | int, sub_key: str | int, value: any):
+            def set(self, dict_key: str | int, sub_key: str | int, value: any) -> bool:
                 """Set or append a value inside a dictionary in the cache."""
                 if dict_key not in self.parent.cache:
                     self.parent.cache[dict_key] = {}
@@ -97,13 +119,14 @@ class TempCache:
                             self.parent.cache[dict_key][sub_key] = new_value
                     else:
                         self.parent.cache[dict_key][sub_key] = value
+                return True
 
             def get(
                 self,
                 dict_key: str | int,
                 sub_key: str | int = None,
-                default: str = None,
-            ):
+                default=None,
+            ) -> any:
                 """Retrieve a value from a dictionary in the cache."""
                 if sub_key:
                     return self.parent.cache.get(dict_key, {}).get(sub_key, default)
@@ -122,13 +145,13 @@ class TempCache:
 
     @property
     def tuple(self):
-        """Handling tuples."""
-
         class TupleWrapper:
+            """Handling tuples."""
+
             def __init__(self, parent):
                 self.parent = parent
 
-            def set(self, key: str | int, value: any):
+            def set(self, key: str | int, value: any) -> bool:
                 """Set or add a value to a tuple in the cache."""
                 if key not in self.parent.cache:
                     self.parent.cache[key] = (value,)
@@ -137,8 +160,9 @@ class TempCache:
                     and value not in self.parent.cache[key]
                 ):
                     self.parent.cache[key] += (value,)
+                return True
 
-            def delete(self, key: str | int, value: any):
+            def delete(self, key: str | int, value: any) -> bool:
                 """Remove a value from a tuple in the cache."""
                 if key in self.parent.cache and isinstance(
                     self.parent.cache[key], tuple
@@ -147,12 +171,15 @@ class TempCache:
                     self.parent.cache[key] = new_tuple
                     if not new_tuple:
                         del self.parent.cache[key]
+                    return True
+                return False
 
         return TupleWrapper(self)
 
-    def clear(self):
+    def clear(self) -> bool:
         """Clear the entire cache."""
         self.cache.clear()
+        return True
 
 
 _util_cache = TempCache(_bot_cache)
@@ -199,8 +226,8 @@ def load_modules(directory: str):
 # https://github.com/Danish-00
 
 
-class KeepSafe:
-    def __init__(self):
+class KeepSafe:  # pylint: disable=missing-class-docstring
+    def __init__(self) -> None:
         self.__data = MappingProxyType(
             {
                 "All": (
@@ -249,19 +276,19 @@ class KeepSafe:
 
     __class__ = type
 
-    def __dir__(self):
+    def __dir__(self) -> list:
         return []
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return "<built-in function KeepSafe>"
 
-    def __call__(self):
+    def __call__(self) -> str:
         raise TypeError("KeepSafe object is not callable")
 
-    def __str__(self):
+    def __str__(self) -> str:
         return "<built-in function KeepSafe>"
 
-    def get(self):
+    def get(self) -> str:
         return self.__data
 
 

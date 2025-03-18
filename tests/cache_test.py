@@ -1,3 +1,11 @@
+# Multi functional Telegram assistant bot.
+# Copyright (c) 2025, Kallistra <kallistraw@gmail.com>
+#
+# This file is a part of <https://github.com/kallistraw/Telegram-Bot-Assistant>
+# and is released under the "BSD-3-Clause License". Please read the full license in
+# <https://github.com/kallistraw/Telegram-Assistant-Bot/blob/main/LICENSE>
+
+
 class TempCache:
     def __init__(self, cache_dict=None):
         self.cache = cache_dict if cache_dict is not None else {}
