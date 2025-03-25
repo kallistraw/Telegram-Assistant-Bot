@@ -8,23 +8,20 @@
 
 from logging import INFO, FileHandler, StreamHandler, basicConfig, getLogger
 import os
-import time
+from typing import Any, Union
 
-# Logger
-log_file = time.strftime("tg-bot.log")
+__all__ = ["_bot_cache", "LOGS"]
 
-# Don't know if this is a good idea or not...
-# Basically, everytime the bot restart,
-# will delete and create a new log file to keep it small and clean
-if os.path.isfile(log_file):
-    os.remove(log_file)
+LOG_FILE = "bot_log.txt"
+if os.path.isfile(LOG_FILE):
+    os.remove(LOG_FILE)
 
 _FMT = "%(asctime)s | %(name)s [%(levelname)s] : %(message)s"
 basicConfig(
     level=INFO,
     format=_FMT,
     datefmt="%H:%M:%S",
-    handlers=[FileHandler(log_file), StreamHandler()],
+    handlers=[FileHandler(LOG_FILE), StreamHandler()],
 )
 
 LOGS = getLogger("BotLogger")
@@ -36,6 +33,5 @@ try:
 except ImportError:
     pass
 
-__all__ = [
-    "LOGS",
-]
+# Cache
+_bot_cache: dict[Union[str | int], Any] = {}

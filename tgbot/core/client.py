@@ -4,182 +4,125 @@
 # This file is a part of <https://github.com/kallistraw/Telegram-Bot-Assistant>
 # and is released under the "BSD-3-Clause License". Please read the full license in
 # <https://github.com/kallistraw/Telegram-Assistant-Bot/blob/main/LICENSE>
-"""This module contain the Python-Telegram-Bot's `Application` (bot) wrapper."""
+"""This module contain the :class:`telegram.ext.Application` subclass."""
 
 import asyncio
-from enum import Enum
 from functools import wraps
+from html import escape
 from io import BytesIO
 from logging import Logger
-import os
+from re import Pattern
+import sys
 import traceback
+from typing import Any, Callable, Collection, Optional, Union
 
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.constants import ParseMode
 from telegram.error import InvalidToken, RetryAfter
 from telegram.ext import (
     Application,
     CallbackQueryHandler,
+    ContextTypes,
     InlineQueryHandler,
     MessageHandler,
     PrefixHandler,
     filters,
 )
-from telegram.ext.filters import MessageFilter
 
-from tgbot.configs import get_var
-from tgbot.core.database import bot_db
+from tgbot.configs import ConfigVars
+from tgbot.core import BotConfig, get_database
 from tgbot.utils import LOGS
 
-__all__ = ("Client", "BotConfig")
+database = get_database()
 
-Var = get_var()
-DB = bot_db()
+__all__ = [
+    "Client",
+]
 
-_file = os.path.dirname(os.path.abspath(__file__))
-_root = os.path.abspath(os.path.join(_file, "../.."))
+Var = ConfigVars()
 
 
-# Do NOT overwrite the argument names
-class BotConfig(Enum):
+class Client(Application):
     """
-    This enum contains the bot's global configuration.
-
-    You should not overwrite the value of the p, you can customize the bot's
-    configuration within the bot itself.
-    See the `settings` command help message for more information.
+    A very simple subclass of `telegram.ext.Application` with Pyrogram-style decorators.
     """
 
-    __slots__ = ()
-
-    CUSTOM_THUMBNAIL = os.path.abspath(os.path.join(_root, "assets/thumbnail.jpeg"))
-    """
-    :obj:`str`: The path to image that is used as a thumbnail when the bot send a documents.
-
-    Note:
-        If you set your thumbnail manually for whatever reason, please make sure that it is in
-        JPEG formats and less than 200 KiB in size. The thumbnail's width should not exceed 320.
-    """
-
-    LANGUAGE = "en"
-    """
-    :obj:`str`: The preferred language used by the bot.
-
-    Note:
-        This feature is still under development and currently only supports `EN`.
-        Languages to be added in the future:
-          - `ID`
-          - `ZH`
-
-        If you want to contribute in the translation, please see the `README` at
-        https://github.com/kallistraw/Telegram-Assistant-Bot/strings/README.md
-    """
-
-    def __str__(self):
-        return str(self.value)  # Ensure string output
-
-
-class Client:
-    """
-    A very simple Python-Telegram-Bot's `Application` (bot) wrapper with Pyrogram-style decorators.
-    """
-
-    def __init__(self, token: str, log_channel: int = None, logger: Logger = LOGS):
-        self._cache: dict[str, str | None] = {}
-        self.application = Application.builder().token(token).build()
-        self.log_channel = log_channel
-        self.bot = self.application.bot
+    def __init__(self, log_group_id: int, logger: Logger = LOGS, **kwargs) -> None:
+        super().__init__(**kwargs)
+        self._cache: dict[str | int, Any] = {}
+        self.log_group_id = log_group_id
         self.bot_info = None
         self.logger = logger
 
         self.logger.info("Initializing bot client...")
+        loop = asyncio.get_event_loop()
+        loop.run_until_complete(self._async_init())
+        self.add_error_handler(self.error_handler)
 
-        # Check for an existing event loop
-        try:
-            loop = asyncio.get_running_loop()
-            loop.create_task(self._async_init())
-        except RuntimeError:
-            asyncio.run(self._async_init())
-
-    async def _async_init(self):
+    async def _async_init(self) -> None:
         """
         Asynchronously initialize the bot and fetch its info.
         """
         try:
-            await self.application.initialize()
-            await self.application.start()
+            await self.bot.initialize()
         except InvalidToken:
             self.logger.error(
-                "The bot token is expired or invalid."
-                "Get a new one from @BotFather and add it in .env file!"
+                "Your bot token is invalid/expired,"
+                "get a new one from @BotFather and put it in the .env file."
             )
-            import sys  # pylint: disable=import-outside-toplevel
-
             sys.exit(1)
 
         self.bot_info = await self.bot.get_me()
         me = self.bot_info
         self.logger.info("Bot initialized! Username: @%s, ID: %s", me.username, me.id)
+        return
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         name = f"@{self.bot_info.username}" if self.bot_info else "Unknown"
         return f"<Telegram.Client name: {name}>"
 
-    def _error_handler(self, func):
+    async def error_handler(
+        self, update: Update, context: ContextTypes.DEFAULT_TYPE
+    ) -> None:
         """
-        Wrapper to catch errors and send them to the log group.
+        Error handler to catch an exception and send them to the log group.
         """
+        self.logger.error(
+            "An error occured while handling an update:", exc_info=context.error
+        )
 
-        @wraps(func)
-        async def wrapper(update, context):
-            try:
-                return await func(update, context)
-            except Exception as e:
-                # We seperating the header and the traceback.
-                # If the message is exceeding Telegram character limit (4096),
-                # will write the traceback into a temporary file and send it with the
-                # header as a caption for better readability.
-                err = (
-                    f"⚠️ **Error Occurred**\n\n"
-                    f"📌 **Function:** `{func.__name__}`\n"
-                    f"❌ **Error:** `{str(e)}`"
-                )
+        tb_list = traceback.format_exception(
+            None, context.error, context.error.__traceback__
+        )
+        tb_str = "".join(tb_list)
+        # update_str = update.to_dict() if isinstance(update, Update) else str(update)
+        text = update.message.text
+        chat = update.message.chat
+        user = update.message.from_user
 
-                tb = traceback.format_exc()
-                error_message = f"{err}\n\n```{tb}```"
+        err = (
+            "⚠️ <b>An error Occurred</b>\n\n"
+            f"<b>Chat:</b> <code>{escape(chat.title)} (chat.id)</code>\n"
+            f"<b>From user:</b> <a href='tg://user?id={user.id}'>{escape(user.first_name)}</a>\n"
+            f"<b>Message:</b> <code>{escape(text)}</code>\n"
+            # f"<pre>{escape(json.dumps(update_str, indent=2, ensure_ascii=False))}</pre>\n\n"
+        )
 
-                if self.log_channel:
-                    if len(error_message) > 4096:
-                        get_thumb = DB.get("CUSTOM_THUMBNAIL")
-                        thumb = BotConfig.CUSTOM_THUMBNAIL if get_thumb else None
-                        with BytesIO(tb.encode()) as tb_file:
-                            tb_file.name = "Traceback.txt"
-                            try:
-                                await context.bot.send_document(
-                                    self.log_channel,
-                                    tb_file,
-                                    caption=err,
-                                    parse_mode=ParseMode.MARKDOWN_V2,
-                                    thumbnail=thumb,
-                                )
-                            except RetryAfter as re:
-                                self.logger.error(
-                                    "Flood control exceeded. Sleeping for %s seconds",
-                                    re.retry_after,
-                                )
-                                await asyncio.sleep(re.retry_after)
-                                await context.bot.send_document(
-                                    self.log_channel,
-                                    tb_file,
-                                    caption=err,
-                                    parse_mode=ParseMode.MARKDOWN_V2,
-                                    thumbnail=thumb,
-                                )
-                        return
+        error_message = err + f"\n\n<pre>{escape(tb_str)}</pre>"
+
+        if self.log_group_id:
+            if len(error_message) > 4096:
+                get_thumb = database.get("CUSTOM_THUMBNAIL")
+                thumb = BotConfig.THUMBNAIL if get_thumb else None
+                with BytesIO(tb_str.encode()) as tb_file:
+                    tb_file.name = "traceback.txt"
                     try:
-                        await context.bot.send_message(
-                            self.log_channel,
-                            error_message,
-                            parse_mode=ParseMode.MARKDOWN_V2,
+                        await context.bot.send_document(
+                            self.log_group_id,
+                            tb_file,
+                            caption=err,
+                            parse_mode=ParseMode.HTML,
+                            thumbnail=thumb,
                         )
                     except RetryAfter as re:
                         self.logger.error(
@@ -187,20 +130,42 @@ class Client:
                             re.retry_after,
                         )
                         await asyncio.sleep(re.retry_after)
-                        await context.bot.send_message(
-                            self.log_channel,
-                            error_message,
-                            parse_mode=ParseMode.MARKDOWN,
+                        await context.bot.send_document(
+                            self.log_group_id,
+                            tb_file,
+                            caption=err,
+                            parse_mode=ParseMode.HTML,
+                            thumbnail=thumb,
                         )
-                self.logger.error(error_message)
+                return
+            try:
+                await context.bot.send_message(
+                    self.log_group_id,
+                    error_message,
+                    parse_mode=ParseMode.HTML,
+                )
+            except RetryAfter as re:
+                self.logger.error(
+                    "Flood control exceeded. Sleeping for %s seconds",
+                    re.retry_after,
+                )
+                await asyncio.sleep(re.retry_after)
+                await context.bot.send_message(
+                    self.log_group_id,
+                    error_message,
+                    parse_mode=ParseMode.HTML,
+                )
 
-        return wrapper
-
-    def _dynamic_filter(self, owner_only=False, devs_only=False, fltrs=None):
+    def _dynamic_filter(
+        self,
+        owner_only: bool = False,
+        admins_only: bool = False,
+        fltrs: Optional[filters.BaseFilter] = None,
+    ) -> Optional[filters.BaseFilter]:
         """
         Dynamically return :obj:`telegram.ext.filters.MessageFilter`.
         """
-        owner = int(Var("OWNER_ID"))
+        owner = Var.OWNER_ID
         extra_filter = fltrs
 
         if owner_only:
@@ -210,12 +175,12 @@ class Client:
                 else filters.User(owner)
             )
 
-        if devs_only:
-            get_devs = DB.get("DEVS")
-            if get_devs:
-                devs = [int(x) for x in get_devs]
-                devs.append(owner)
-                dev_filter = filters.User(devs)
+        if admins_only:
+            get_admins = database.get("ADMINS", [])
+            if get_admins:
+                admins = [int(x) for x in get_admins]
+                admins.append(owner)
+                dev_filter = filters.User(admins)
                 extra_filter = (
                     (extra_filter & dev_filter) if extra_filter else dev_filter
                 )
@@ -227,103 +192,172 @@ class Client:
                 )
         return extra_filter
 
-    def on_cmd(
-        self, commands: str | list[str], prefixes: str | list[str] = None, **kwargs
-    ):
+    def on_command(
+        self,
+        commands: Union[str, Collection[str]],
+        prefixes: Optional[Union[str, Collection[str]]],
+        **kwargs,
+    ) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
         """
         Decorator for handling commands.
+        For more information, read the official :class:`telegram.ext.PrefixHandler` documentation.
 
         Arguments:
-            commands (:obj:`str` or :obj:`list` of :obj:`str`):
-                Command names (e.g., `'start'` or `['ping', 'p']`).
-            prefixes (:obj:`str` or :obj:`list` of :obj:`str`, optional):
-                Allowed prefixes (e.g., `'/'` or `['/', '!']`). Defaults to `'/'`.
+            commands (:obj:`str` | Collection[:obj:`str`]): Command names
+                (e.g., ``'start'`` or ``['ping', 'p']``).
+            prefixes (:obj:`str` | Collection[:obj:`str`], optional): Allowed prefixes
+                (e.g., ``'/'`` or ``['/', '!']``). Defaults to the value of ``PREFIXES`` in the
+                database or in `.env` file. If not present in the database or `.env` file, will
+                use `'/'`.
 
         Keyword arguments:
-            owner_only (:obj:`bool`, optional):
-                Whether the command should only work for the bot's owner. Defaults to ``False``.
-            devs_only (:obj:`bool`, optional):
-                Whether the command should only work for the bot's owner and developers.
-                Defaults to ``False``. See the `auth` command help message for more details.
-            fltrs (:obj:`telegram.ext.filters.MessageFilter`, optional):
-                Additional `telegram.ext.filters` for filtering messages. Defaults to ``None``.
+            owner_only (:obj:`bool`, optional): Whether the command should only work for the bot's
+                owner. Defaults to ``False``.
+            admins_only (:obj:`bool`, optional): Whether the command should only work for the bot's
+                owner and admins. Defaults to ``False``. See the `auth` command help message for
+                more details.
+            chat_type (:obj:`str`, optional): If set to `"group"` the command will only work in
+                groups. If set to `"private"`, will only work in private messages. Defaults to
+                ``None``.
+            filters (:mod:`telegram.ext.filters`, optional): Additional :mod:`telegram.ext.filters`
+                for filtering messages. Defaults to ``None``.
         """
-        prefixes = prefixes or DB.get("PREFIXES") or Var("PREFIXES")
+        prefixes = prefixes or database.get("PREFIXES") or Var.PREFIXES
         owner_only = kwargs.get("owner_only", False)
-        devs_only = kwargs.get("devs_only", False)
+        admins_only = kwargs.get("admins_only", False)
+        chat_type = kwargs.get("chat_type", None)
         fltrs = kwargs.get("filters", None)
-        extra_filter = self._dynamic_filter(owner_only, devs_only, fltrs)
+        if isinstance(prefixes, str):
+            prefixes = list(prefixes)
 
-        def decorator(func):
-            wrapped_func = self._error_handler(func)
+        # Append '/' to the prefixes since it is the most common prefixes
+        if "/" not in prefixes:
+            prefixes.append("/")
 
-            self.application.add_handler(
-                PrefixHandler(
-                    prefixes,
-                    commands,
-                    callback=wrapped_func,
-                    filters=extra_filter,
-                )
+        @wraps
+        def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
+            @wraps(func)
+            async def wrapper(
+                update: Update, context: ContextTypes.DEFAULT_TYPE, *args, **kwargs
+            ):
+                owner = Var.OWNER_ID
+                user = update.message.from_user
+                is_group = update.message.chat.type in ["group", "supergroup"]
+
+                if owner_only and user.id != owner:
+                    await update.message.reply_text(
+                        "You are not authorized to use this command."
+                    )
+                    return
+
+                if admins_only:
+                    get_admins = database.get("ADMINS") or []
+                    admins = [int(x) for x in get_admins]
+                    admins.append(owner)
+
+                    if user.id not in admins:
+                        await update.message.reply_text(
+                            "You are not authorized to use this command"
+                        )
+                        return
+
+                if chat_type.lower() == "private" and is_group:
+                    bot_username = context.bot.username
+                    command = update.message.text.split()[0]
+
+                    keyboard = [
+                        [
+                            InlineKeyboardButton(
+                                "Click Me!",
+                                url=f"https://t.me/{bot_username}?start={command[1:]}",
+                            )
+                        ]
+                    ]
+                    reply_markup = InlineKeyboardMarkup(keyboard)
+                    name = escape(user.full_name)
+
+                    await update.message.reply_text(
+                        f"Heya {name}! This command only work in private chat."
+                        "\nClick the button bellow to use this command.",
+                        reply_markup=reply_markup,
+                    )
+                    return
+
+                if chat_type.lower() == "group" and not is_group:
+                    await update.message.reply_text(
+                        f"Heya {escape(user.full_name)}! This command only work in group chat."
+                    )
+                    return
+
+                return await func(update, context, *args, **kwargs)
+
+            self.add_handler(
+                PrefixHandler(prefixes, commands, callback=wrapper, filters=fltrs)
             )
-            return wrapped_func
+            return wrapper
 
         return decorator
 
-    def on_msg(
-        self,
-        owner_only: bool = False,
-        devs_only: bool = False,
-        fltrs: MessageFilter = None,
-    ):
+    def on_message(
+        self, **kwargs
+    ) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
         """
         Decorator for handling messages.
 
-        Arguments:
-            owner_only (:obj:`bool`, optional):
-                Whether the handler should only work for the bot's owner. Defaults to ``False``.
-            devs_only (:obj:`bool`, optional):
-                Whether the handler should only work for the bot's owner and developers.
-                Defaults to ``False``. See the `auth` command help message for more details.
-            fltrs (:obj:`telegram.ext.filters.MessageFilter`, optional):
-                Additional `telegram.ext.filters` for filtering messages. Defaults to ``None``.
+        Keyword Arguments:
+            owner_only (:obj:`bool`, optional): Whether the handler should only work for the bot's
+                owner. Defaults to ``False``.
+            admins_only (:obj:`bool`, optional): Whether the handler should only work for the bot's
+                owner and developers. Defaults to ``False``. See the `auth` command help message
+                for more details.
+            filters (:mod:`telegram.ext.filters`, optional): Additional :mod:`telegram.ext.filters`
+                for filtering messages. Defaults to ``None``.
         """
+        owner_only = kwargs.get("owner_only", False)
+        admins_only = kwargs.get("admins_only", False)
+        fltrs = kwargs.get("filters", None)
 
-        extra_filter = self._dynamic_filter(owner_only, devs_only, fltrs)
+        extra_filter = self._dynamic_filter(owner_only, admins_only, fltrs)
 
-        def decorator(func):
-            wrapped_func = self._error_handler(func)
-            self.application.add_handler(
-                MessageHandler(callback=wrapped_func, filters=extra_filter)
-            )
-            return wrapped_func
+        @wraps
+        def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
+            self.add_handler(MessageHandler(callback=func, filters=extra_filter))
+            return func
 
         return decorator
 
-    def on_inline(
-        self,
-    ):
+    def on_inline(self) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
         """
         Decorator for handling inline queries.
         """
 
-        def decorator(func):
-            wrapped_func = self._error_handler(func)
-            self.application.add_handler(InlineQueryHandler(callback=wrapped_func))
-            return wrapped_func
+        @wraps
+        def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
+            self.add_handler(InlineQueryHandler(callback=func))
+            return func
 
         return decorator
 
     def on_callback(
         self,
-    ):
+        pattern: Optional[
+            Union[str, Pattern[str], type, Callable[[object], Optional[bool]]]
+        ] = None,
+    ) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
         """
         Decorator for handling button callback queries.
+
+        Arguments:
+            pattern (:obj:`str` | :func:`re.Pattern <re.compile>` | :obj:`callable` | :obj:`type`,\
+             optional):
+                Pattern to test the callback query data against. For more information, please refer
+                to :class:`telegram.ext.CallbackQueryHandler` documentation.
         """
 
-        def decorator(func):
-            wrapped_func = self._error_handler(func)
-            self.application.add_handler(CallbackQueryHandler(callback=wrapped_func))
-            return wrapped_func
+        @wraps
+        def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
+            self.add_handler(CallbackQueryHandler(callback=func, pattern=pattern))
+            return func
 
         return decorator
 
@@ -331,4 +365,4 @@ class Client:
         """
         Starts the bot with polling.
         """
-        self.application.run_polling()
+        self.run_polling()

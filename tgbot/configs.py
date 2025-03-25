@@ -4,58 +4,31 @@
 # This file is a part of <https://github.com/kallistraw/Telegram-Bot-Assistant>
 # and is released under the "BSD-3-Clause License". Please read the full license in
 # <https://github.com/kallistraw/Telegram-Assistant-Bot/blob/main/LICENSE>
-"""The main configurations"""
+# pylint: disable=too-few-public-methods
+"""This module contains the `ConfigVars` class."""
 
 from decouple import config
 
 
-# NOTE: Do NOT override this class.
-# Make a new one if you really need to do so.
 class ConfigVars:
-    """This class is used to manage environment variables."""
+    """
+    This class is used to fetch environment variables and set a default values.
+    """
 
-    __slots__ = ("_variables",)
+    # Mandatory
+    BOT_TOKEN = (config("BOT_TOKEN", default=None),)
+    OWNER_ID = (config("OWNER_ID", cast=int, default=0),)
+    _LOG = (config("LOG_GROUP_ID", default=""),)
 
-    def __init__(self):
-        self._variables = {
-            # Mandatory
-            "BOT_TOKEN": config("BOT_TOKEN", default=None),
-            "OWNER_ID": config("OWNER_ID", cast=int, default=0),
-            # MongoDB
-            "MONGO_URI": config("MONGO_URI", default=None),
-            # PostgreSQL
-            "DATABASE_URL": config("DATABASE_URL", default=None),
-            # Optional
-            "BOT_LOGGING": config("BOT_LOGGING", cast=bool, default=True),
-            "LOG_CHANNEL": config("LOG_CHANNEL", default=""),
-            "PREFIXES": config("PREFIXES", cast=lambda v: v.split(), default="/"),
-            "API_ID": config("API_ID", cast=int, default=6),
-            "API_HASH": config("API_HASH", default="eb06d4abfb49dc3eeb1aeb98ae0f581e"),
-        }
+    # Optional
+    PREFIXES = (config("PREFIXES", cast=lambda v: v.split(), default="/"),)
+    OWNER_ONLY = (config("OWNER_ONLY", cast=bool, default=True),)
+    FORUM_TOPIC = (config("FORUM_TOPIC", cast=bool, default=False),)
+    PM_GROUP_ID = (config("PM_GROUP_ID", cast=int, default=0),)
+    MAX_WARNING = (config("MAX_WARNING", cast=int, default=3),)
 
-        # Convert LOG_CHANNEL to integer or default to OWNER_ID
-        try:
-            self._variables["LOG_CHANNEL"] = int(self._variables["LOG_CHANNEL"])
-        except ValueError:
-            self._variables["LOG_CHANNEL"] = self._variables["OWNER_ID"]
-
-    def __call__(self, key):
-        return self._variables.get(key)
-
-    def __reduce__(self):
-        raise TypeError("<ConfigVars>")
-
-    def __repr__(self):
-        return "<ConfigVars>"
-
-
-# Lazy initialization
-_VAR_INSTANCE = None
-
-
-def get_var():
-    """Returns the configuration instance."""
-    global _VAR_INSTANCE  # pylint: disable=global-statement
-    if _VAR_INSTANCE is None:
-        _VAR_INSTANCE = ConfigVars()
-    return _VAR_INSTANCE
+    # Convert LOG_GROUP_ID to integer or default to OWNER_ID
+    try:
+        LOG_GROUP_ID = int(_LOG)
+    except ValueError:
+        LOG_GROUP_ID = OWNER_ID
