@@ -6,48 +6,100 @@
 # <https://github.com/kallistraw/Telegram-Assistant-Bot/blob/main/LICENSE>
 # pylint: disable=missing-function-docstring
 """This module contains some helper functions."""
-
-import importlib
+import ast
+import json
 import os
-import traceback
 from types import MappingProxyType
+from typing import Any, Collection, Optional, Union
 
 from . import LOGS
 
 __all__ = (
-    "load_modules",
-    "is_dangerous",
-    "TempCache",
     "censors",
+    "get_files",
+    "is_dangerous",
+    "safe_convert",
+    "TempCache",
 )
 
-_bot_cache: dict[str | int, any] = {}
+
+# ----------------------------------------------------------------------------------------------- #
+# Handling data types for storing it from Telegram to database
+
+
+def safe_convert(value: str) -> Union[list, dict, int, float, bool, str]:
+    """
+    Converts a string into the correct Python data type.
+
+    Handles int, float, list, dict, and bool` safely.
+    Useful for handling Telegram message.
+
+    Arguments:
+        value (str): The string to be converted.
+
+    Returns:
+        int: If the value is a number.
+        float: If the value is a float.
+        list: If the value is a Python list.
+        dict: If the value is a Python dictionary.
+        bool: If the value is a Boolean.
+        str: If the value is none of the above.
+    """
+    value = value.strip()
+
+    # Try to parse JSON (for lists/dicts)
+    try:
+        return json.loads(value)
+    except (json.JSONDecodeError, TypeError):
+        pass
+
+    # Try to evaluate numbers, lists, and other basic types
+    try:
+        return ast.literal_eval(value)
+    except (ValueError, SyntaxError):
+        pass
+
+    # Check for boolean values
+    if value.lower() in ("true", "false"):
+        return value.lower() == "true"
+
+    # Try parsing as a number
+    try:
+        return int(value) if value.lstrip("-").isdigit() else float(value)
+    except ValueError:
+        pass
+
+    return value  # Default: return as a string
+
+
+# ----------------------------------------------------------------------------------------------- #
+# Cache manager
 
 
 # Why not...
 class TempCache:
-    """Caching logic that can handle different data types."""
+    """Cache manager that can handle different data types easily."""
 
-    def __init__(self, cache_dict: dict[str | int, any] = None) -> None:
+    def __init__(self, cache_dict: Optional[dict]) -> None:
         """
         Initialize with an external dictionary (or create a new one if None).
 
         Arguments:
-            cache_dict (:obj:`dict`):
-                A dictionary to use as a temporary cache storage.
+            cache_dict (dict, optional):
+                The dictionary to use as a temporary cache storage.
         """
         self.cache = cache_dict if cache_dict is not None else {}
 
-    def set(self, key: str | int, value: any) -> bool:
+    def set(self, key: Union[str, int], value: Union[str, int]) -> bool:
         """Set a value in the cache."""
         self.cache[key] = value
         return True
 
-    def get(self, key: str | int, default=None) -> any:
+    def get(self, key: Union[str, int], default: object = None) -> Any:
         """Retrieve a value from the cache."""
         return self.cache.get(key, default)
 
-    def delete(self, key: str) -> bool:
+    def delete(self, key: Union[str, int]) -> bool:
         """Delete a key from the cache."""
         if key not in self.cache:
             LOGS.error("No such key: %s", key)
@@ -65,7 +117,7 @@ class TempCache:
             def __init__(self, parent) -> None:
                 self.parent = parent
 
-            def set(self, key: str | int, value: any) -> bool:
+            def set(self, key: Union[str, int], value: Any) -> bool:
                 """Set or extend a value to a list in the cache."""
                 if key not in self.parent.cache:
                     self.parent.cache[key] = []
@@ -78,7 +130,7 @@ class TempCache:
                     self.parent.cache[key].append(value)
                 return True
 
-            def delete(self, key: str | int, value: any) -> bool:
+            def delete(self, key: Union[str, int], value: Any) -> bool:
                 """Remove a value from a list in the cache."""
                 if key in self.parent.cache and isinstance(
                     self.parent.cache[key], list
@@ -101,10 +153,12 @@ class TempCache:
         class DictWrapper:
             """Handling dictionaries."""  # Hehe(2)...
 
-            def __init__(self, parent) -> bool:
+            def __init__(self, parent) -> None:
                 self.parent = parent
 
-            def set(self, dict_key: str | int, sub_key: str | int, value: any) -> bool:
+            def set(
+                self, dict_key: Union[str, int], sub_key: Union[str, int], value: Any
+            ) -> bool:
                 """Set or append a value inside a dictionary in the cache."""
                 if dict_key not in self.parent.cache:
                     self.parent.cache[dict_key] = {}
@@ -123,16 +177,16 @@ class TempCache:
 
             def get(
                 self,
-                dict_key: str | int,
-                sub_key: str | int = None,
+                dict_key: Union[str, int],
+                sub_key: Optional[Union[str, int]] = None,
                 default=None,
-            ) -> any:
+            ) -> Any:
                 """Retrieve a value from a dictionary in the cache."""
                 if sub_key:
                     return self.parent.cache.get(dict_key, {}).get(sub_key, default)
                 return self.parent.cache.get(dict_key, {})
 
-            def delete(self, dict_key: str | int, sub_key: str | int):
+            def delete(self, dict_key: Union[str, int], sub_key: Union[str, int]):
                 """Delete a key inside a dictionary in the cache."""
                 if dict_key in self.parent.cache and isinstance(
                     self.parent.cache[dict_key], dict
@@ -151,7 +205,7 @@ class TempCache:
             def __init__(self, parent):
                 self.parent = parent
 
-            def set(self, key: str | int, value: any) -> bool:
+            def set(self, key: Union[str, int], value: Any) -> bool:
                 """Set or add a value to a tuple in the cache."""
                 if key not in self.parent.cache:
                     self.parent.cache[key] = (value,)
@@ -162,7 +216,7 @@ class TempCache:
                     self.parent.cache[key] += (value,)
                 return True
 
-            def delete(self, key: str | int, value: any) -> bool:
+            def delete(self, key: Union[str, int], value: Any) -> bool:
                 """Remove a value from a tuple in the cache."""
                 if key in self.parent.cache and isinstance(
                     self.parent.cache[key], tuple
@@ -182,39 +236,67 @@ class TempCache:
         return True
 
 
-_util_cache = TempCache(_bot_cache)
+# ----------------------------------------------------------------------------------------------- #
+# Miscellaneous
 
 
-def load_modules(directory: str):
+def get_files(
+    directory: str, extensions: Union[str, Collection[str]], recursive: bool = False
+) -> list:
     """
-    Dynamically imports all Python files inside the given directory.
+    Fetch all files with the given extension(s) from the specified directory.
 
-    The directory should be placed in the root directory of this project.
-    Or pass the directory like so: `path/to/module_dir`
+    Example:
+    .. code-block:: python
+
+        directory_path = "/path/to/directory"
+
+        # Get all Python files inside 'directory_path'
+        py_files = get_files(directory_path, ".py")
+        print(f"Found {len(py_files)} Python files:\n" + "\n".join(py_files)
+
+        # Get all Python and Ruby files from 'directory_path'
+        py_rb_files = get_files(directory_path, [".py", ".rb"])
+        print(f"Found {len(py_rb_files)} Python and Ruby files:\n" + "\n".join(py_files)
+
+        # Get all TXT files recursively
+        txt_files = get_files(directory_path, ".txt", recursive=True)
+        print(f"Found {len(txt_files)} TXT files:\n" + "\n".join(txt_files))
+
+    Arguments:
+        directory (str):
+            The path to directory.
+        extensions (str` or list` of str):
+            The extension(s) of the files.
+        recursive (bool, optional):
+            If set to ``True`, will search files recursively. Defaults to ``False``
+
+    Returns:
+        files (list):
+            Àll file that ends with :param:`extensions`.
     """
-    # Get the root directory.
-    base_dir = os.path.dirname(
-        os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    )
-    module_dir = os.path.join(base_dir, str(directory))
-    if not os.path.exists(module_dir):
-        raise FileNotFoundError(f"No such directory: '{module_dir}'")
+    if not os.path.isdir(directory):
+        raise ValueError(f"Invalid directory: {directory}")
 
-    for file in os.listdir(module_dir):
-        if file.endswith(".py") and not file.startswith("__"):
-            module_name = f"{module_dir}.{file[:-3]}"
-            try:
-                importlib.import_module(module_name)
-                _util_cache.dict.set("loaded_plugins", directory, module_name)
+    if isinstance(extensions, str):
+        extensions = list(extensions)
 
-            except Exception as e:
-                # debugging-purpose
-                # pylint: disable=import-outside-toplevel
-                import sys
+    if recursive:
+        files = []
+        for _root, _dirs, _files in os.walk(directory):
+            for f in _files:
+                if any(f.endswith(ext) for ext in extensions):
+                    files.append(f)
+        return files
 
-                tb = traceback.format_exc()
-                LOGS.error("Failed to load %s: %s\n%s", module_name, e, tb)
-                sys.exit()
+    files = [
+        f for f in os.listdir(directory) if any(f.endswith(ext) for ext in extensions)
+    ]
+    return files
+
+
+# ----------------------------------------------------------------------------------------------- #
+# Safety-related helpers
 
 
 # If you don't know or you're not sure what you're doing,
@@ -228,9 +310,10 @@ def load_modules(directory: str):
 
 class KeepSafe:  # pylint: disable=missing-class-docstring
     def __init__(self) -> None:
-        self.__data = MappingProxyType(
+        self._data = MappingProxyType(
             {
                 "All": (
+                    "run_shell",
                     "BOT_TOKEN",
                     "DeleteAccountRequest",
                     "base64",
@@ -251,8 +334,6 @@ class KeepSafe:  # pylint: disable=missing-class-docstring
                     ".flushall",
                     ".env",
                     "DEVS",
-                ),
-                "Cmds": (
                     "rm -rf",
                     "shutdown",
                     "reboot",
@@ -266,8 +347,6 @@ class KeepSafe:  # pylint: disable=missing-class-docstring
                     "bot_token",
                     "api_id",
                     "api_hash",
-                    "mongo_uri",
-                    "database_url",
                 ),
             }
         )
@@ -277,7 +356,7 @@ class KeepSafe:  # pylint: disable=missing-class-docstring
     __class__ = type
 
     def __dir__(self) -> list:
-        return []
+        return ["get"]
 
     def __repr__(self) -> str:
         return "<built-in function KeepSafe>"
@@ -289,22 +368,20 @@ class KeepSafe:  # pylint: disable=missing-class-docstring
         return "<built-in function KeepSafe>"
 
     def get(self) -> str:
-        return self.__data
+        return self._data
 
 
 def is_dangerous(cmd: str) -> bool:
     """
-    Determine wheter something is considered dangerous or not.
+    Determine wheter an operation is considered dangerous or not.
 
-    Args:
-        cmd (:obj:`str`): The string to be analyzed.
+    Arguments:
+        cmd (str): The string of the operation.
 
     Returns:
-        :obj:`bool`: `True` if it's dangerous.
+        bool: ``True`` if it's dangerous.
     """
-    return any(c in cmd for c in KeepSafe().get()["Cmds"]) or any(
-        d in cmd for d in KeepSafe().get()["All"]
-    )
+    return any(d in cmd for d in KeepSafe().get()["All"])
 
 
 def censors(text: str) -> str:

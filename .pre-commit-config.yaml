@@ -19,11 +19,11 @@ repos:
       - id: black
         exclude: "^(tests/|migrations/|venv/)"
 
-#  - repo: https://github.com/PyCQA/flake8
-#    rev: 7.1.2
-#    hooks:
-#      - id: flake8
-#        exclude: "^(tests/|migrations/|venv/)"
+  - repo: https://github.com/PyCQA/flake8
+    rev: 7.1.2
+    hooks:
+      - id: flake8
+        exclude: "^(tests/|migrations/|venv/)"
 
   - repo: https://github.com/pycqa/isort
     rev: 5.13.2
@@ -36,19 +36,12 @@ repos:
     hooks:
       - id: pylint
         additional_dependencies:
-          - python-decouple
           - python-telegram-bot
-          - humanize
-        args: ["--disable=broad-exception-caught", "--jobs=4"]
-        exclude: "^(tests/|migrations/|venv/)"
-
-#  - repo: https://github.com/asottile/reorder-python-imports
-#    rev: v3.14.0
-#    hooks:
-#      - id: reorder-python-imports
-#  - repo: https://github.com/astral-sh/ruff-pre-commit
-#    rev: v0.4.1
-#    hooks:
-#      - id: ruff
-#        args: ["--fix", "--verbose"]
-#      - id: ruff-format
+        args: ["--disable=broad-exception-caught,import-error", "--jobs=4"]
+        exclude: "^(tests/|migrations/|venv/|modules/)"
+      - id: pylint
+        name: pylint-modules
+        additional_dependencies:
+          - python-telegram-bot
+        args: ["--disable=unused-import,unused-argument,broad-exception-caught"]
+        files: ^modules/

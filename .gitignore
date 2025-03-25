@@ -178,3 +178,10 @@ cython_debug/
 
 # Misc
 *.save
+
+# My TODO file for saving functions that Ì'd like to make but my brain can't complete it yet.
+my_todo.*
+
+# PicklePersistence
+*.pkl
+*.pickle
