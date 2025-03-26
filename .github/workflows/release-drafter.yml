@@ -9,8 +9,6 @@ on:
       - closed
   workflow_dispatch:
 
-permissions: write
-
 jobs:
   update_release_draft:
     permissions:
