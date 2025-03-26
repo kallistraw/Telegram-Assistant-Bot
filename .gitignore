@@ -185,3 +185,6 @@ my_todo.*
 # PicklePersistence
 *.pkl
 *.pickle
+
+# Private tests
+tests/
