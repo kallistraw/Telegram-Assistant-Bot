@@ -12,7 +12,7 @@ from typing import Any, Union
 
 __all__ = ["_bot_cache", "LOGS"]
 
-LOG_FILE = "bot_log.txt"
+LOG_FILE = "bot_log.log"
 if os.path.isfile(LOG_FILE):
     os.remove(LOG_FILE)
 

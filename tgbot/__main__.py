@@ -4,7 +4,7 @@
 # This file is a part of <https://github.com/kallistraw/Telegram-Bot-Assistant>
 # and is released under the "BSD-3-Clause License". Please read the full license in
 # <https://github.com/kallistraw/Telegram-Assistant-Bot/blob/main/LICENSE>
-# pylint: disable=import-outside-toplevel
+# pylint: disable=C0415
 """This module serves as the main entry point."""
 from tgbot.utils import LOGS
 
@@ -41,7 +41,6 @@ def main():
     _time_taken = f"Bot started in {(time.time() - StartTime) * 1000}"
     LOGS.info(_time_taken)
     LOGS.info(_SUCCESS)
-    print(bot.log_channel)
     bot.run_polling(allowed_updates=Update.ALL_TYPES)
 
 

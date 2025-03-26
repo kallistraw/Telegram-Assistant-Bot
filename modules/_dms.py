@@ -29,8 +29,7 @@ COLORS = [
     ForumIconColor.PINK,
 ]
 
-owner = bot.bot.get_chat(OWNER_ID)
-_OWNER = mention_html(OWNER_ID, owner.full_name)
+
 _FORWARDED_MSG = (
     "Your message has been forwarded, please kindly <i>wait for reply</i>.\n"
     "If you spamming, you will get a warning. Your current warning count is {}.\n"
@@ -184,6 +183,10 @@ async def forward_to_owner(
     update: Update, context: ContextTypes.DEFAULT_TYPE, topic_id: int | None = None
 ) -> None:
     """A helper function to forward user messages to the bot's owner/admins"""
+
+    owner = context.bot.get_chat(OWNER_ID)
+    _owner = mention_html(OWNER_ID, owner.first_name)
+
     user = update.message.from_user
     warning_count = context.user_data.get("warning_count")
     warn_per_max = f"{warning_count}/{MAX_WARNING}"
@@ -192,7 +195,7 @@ async def forward_to_owner(
     is_blocked = context.bot_data.get(f"blocked_{user.id}")
     if is_blocked:
         await update.message.reply_text(
-            f"Opsie, looks like you was blocked from texting {_OWNER}.\n"
+            f"Opsie, looks like you was blocked from texting {_owner}.\n"
             f"Reason:\n{escape(is_blocked)}"
         )
         return
@@ -202,7 +205,7 @@ async def forward_to_owner(
             await update.message.forward(PM_GROUP_ID, message_thread_id=topic_id)
             if context.user_data.get("is_first_time", True):
                 await update.message.reply_text(
-                    _FORWARDED_MSG.format(warn_per_max, MAX_WARNING, _OWNER)
+                    _FORWARDED_MSG.format(warn_per_max, MAX_WARNING, _owner)
                 )
 
                 context.user_data["is_first_time"] = False
@@ -221,7 +224,7 @@ async def forward_to_owner(
         await update.message.forward(OWNER_ID)
         if context.user_data.get("is_first_time", True):
             await update.message.reply_text(
-                _FORWARDED_MSG.format(warn_per_max, MAX_WARNING, _OWNER)
+                _FORWARDED_MSG.format(warn_per_max, MAX_WARNING, _owner)
             )
 
             context.user_data["is_first_time"] = False

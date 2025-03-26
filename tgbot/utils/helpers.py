@@ -4,7 +4,7 @@
 # This file is a part of <https://github.com/kallistraw/Telegram-Bot-Assistant>
 # and is released under the "BSD-3-Clause License". Please read the full license in
 # <https://github.com/kallistraw/Telegram-Assistant-Bot/blob/main/LICENSE>
-# pylint: disable=missing-function-docstring
+# pylint: disable=C0116
 """This module contains some helper functions."""
 import ast
 import json
@@ -308,7 +308,7 @@ def get_files(
 # https://github.com/Danish-00
 
 
-class KeepSafe:  # pylint: disable=missing-class-docstring
+class KeepSafe:  # pylint: disable=C0115
     def __init__(self) -> None:
         self._data = MappingProxyType(
             {

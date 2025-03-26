@@ -25,7 +25,7 @@ _DB_INSTANCE = None
 
 def get_database():
     """Returns the database instance."""
-    global _DB_INSTANCE  # pylint: disable=global-statement
+    global _DB_INSTANCE  # pylint: disable=W0603
     if _DB_INSTANCE is None:
         _DB_INSTANCE = SQLite(logger=LOGS)
         return _DB_INSTANCE
