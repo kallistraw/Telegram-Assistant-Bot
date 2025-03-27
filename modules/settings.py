@@ -52,7 +52,7 @@ async def settings_(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
     act = query.data.split("_")[1]
     if act == "thumbnail":
-        context.user_data["waiting_thumbnail"] = True
+        async with 
         await query.edit_message_text("Send a photo to set as a custom thumbnail.\n")
 
     elif act == "prefix":
