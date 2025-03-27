@@ -7,13 +7,13 @@
 """This module contain the telegram.ext.Application subclass."""
 
 import asyncio
-from contextlib import asynccontextmanager
+import json
+import traceback
 from functools import wraps
 from html import escape
 from io import BytesIO
 from logging import Logger
 from re import Pattern
-import traceback
 from typing import Any, Callable, Collection, Optional, Union
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update, User
@@ -42,22 +42,6 @@ __all__ = [
 Var = ConfigVars()
 
 
-class ConversationManager:  # pylint: disable=R0903
-    """A very simple conversation manager using `asyncio.Queue()`"""
-
-    def __init__(self, chat_id: int, timeout: Optional[int] = 300) -> None:
-        self.chat_id = chat_id
-        self.queue = asyncio.Queue()
-        self.timeout = timeout
-
-    async def wait_update(self) -> Union[Update, None]:
-        """Wait for the next message with a timeout."""
-        try:
-            return await asyncio.wait_for(self.queue.get(), timeout=self.timeout)
-        except asyncio.TimeoutError:
-            return None  # Return None if the user takes too long
-
-
 class TelegramApplication(Application):
     """
     A very simple subclass of telegram.ext.Application with Pyrogram-style decorators.
@@ -65,52 +49,15 @@ class TelegramApplication(Application):
 
     def __init__(self, log_group_id: int, logger: Logger = LOGS, **kwargs) -> None:
         super().__init__(**kwargs)
-        self._convo: dict[Any, Any] = {}
+        self._cache: dict[Any, Any] = {}
         self.log_group_id: int = log_group_id
         self.bot_info: Optional[User] = None
         self.logger: Logger = logger
-        self._msg_handler: Optional[MessageHandler] = None
 
         self.logger.info("Initializing Application...")
         loop = asyncio.get_event_loop()
         loop.run_until_complete(self._async_init())
         self.add_error_handler(self.error_handler)
-
-    # Copies Telethon's `TelegramClient.converation()` behavior
-    @asynccontextmanager
-    async def conversation(self, chat_id: int, timeout: Optional[int] = 300) -> None:
-        """
-        Async conversation manager with timeout.
-
-        Arguments:
-            chat_id (int): The chat ID to hold a conversation to.
-            timeout (int, optional): How long (in seconds) the bot should hold the conversation.
-                Defaults to `300` (5 minutes)
-        """
-        conv = ConversationManager(chat_id, timeout)
-        self._convo[chat_id] = conv
-
-        if not hasattr(self, "_msg_handler"):
-            self._msg_handler = MessageHandler(
-                filters.ChatType.PRIVATE, self._handle_update
-            )
-            self.add_handler(self._msg_handler)
-
-        try:
-            yield conv
-        finally:
-            del self._convo[chat_id]
-
-            # Remove handler if there's no active conversations
-            if not self._convo:
-                self.remove_handler(self._msg_handler)
-                del self._msg_handler
-
-    async def _handle_update(self, update: Update):
-        """Routes incoming updates to the correct conversation queue."""
-        chat_id = update.message.chat_id
-        if chat_id in self._convo:
-            await self._convo[chat_id].queue.put(update)
 
     async def _async_init(self) -> None:
         """
@@ -182,7 +129,7 @@ class TelegramApplication(Application):
             "⚠️ <b>An error Occurred</b>\n\n"
             f"<b>Chat:</b> <code>{escape(chat.effective_name)} (chat.id)</code>\n"
             f"<b>From user:</b> {user.mention_html()}\n"
-            f"<b>Message:</b> <code>{escape(text)}</code>\n"
+            f"<b>Message:</b> <code>{escape(json.dumps(text))}</code>\n"
             # f"<pre>{escape(json.dumps(update_str, indent=2, ensure_ascii=False))}</pre>\n\n"
         )
 

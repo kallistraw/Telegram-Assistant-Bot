@@ -37,11 +37,14 @@ repos:
       - id: pylint
         additional_dependencies:
           - python-telegram-bot
-        args: ["--disable=broad-exception-caught,import-error", "--jobs=4"]
+        args:
+        - --disable=broad-exception-caught,import-error
+        - --jobs=4
         exclude: "^(tests/|migrations/|venv/|modules/)"
       - id: pylint
         name: pylint-modules
         additional_dependencies:
           - python-telegram-bot
-        args: ["--disable=unused-import,unused-argument,broad-exception-caught,import-error"]
+        args:
+        - --disable=unused-import,unused-argument,broad-exception-caught,import-error
         files: ^modules/

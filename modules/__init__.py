@@ -7,6 +7,9 @@
 """
 This module contains global variables, modules cache, and commonly used imports.
 """
+from telegram import Update
+from telegram.ext import ConversationHandler, PrefixHandler
+
 from tgbot import Var, bot, database
 from tgbot.core import BotConfig
 from tgbot.utils import LOGS, _bot_cache
@@ -28,6 +31,7 @@ __all__ = (
     "bot",
     "BotConfig",
     "bot_cache",
+    "cancel_fallback",
     "censors",
     "db",
     "FORUM_TOPIC",
@@ -50,6 +54,7 @@ __all__ = (
 db = database
 
 # Constants
+PREFIXES = db.get("PREFIXES") or Var.PREFIXES
 LOG_GROUP_ID = db.get("LOG_GROUP_ID") or Var.LOG_GROUP_ID
 OWNER_ID = Var.OWNER_ID
 AUTH_LIST = [
@@ -66,9 +71,24 @@ if not Var.OWNER_ONLY:
     elif isinstance(ADMINS, str):
         AUTH_LIST.append(ADMINS)
 
+if isinstance(PREFIXES, str):
+    PREFIXES = list(PREFIXES)
+
+elif isinstance(PREFIXES, list) and "/" not in PREFIXES:
+    PREFIXES.append("/")
 
 # For caching some data to make modules work faster.
 _module_cache: dict[str, object] = {}
 module_cache = TempCache(_module_cache)
 bot_cache = TempCache(_bot_cache)
 LOADED = bot_cache.get("loaded_modules")
+
+
+# Default fallbacks for ConversationHandler
+async def cancel(update: Update, context) -> int:
+    """Cancel the conversation."""
+    await update.message.reply_text("Canceled.")
+    return ConversationHandler.END
+
+
+cancel_fallback = PrefixHandler("cancel", PREFIXES, cancel)

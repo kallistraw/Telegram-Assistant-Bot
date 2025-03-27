@@ -4,13 +4,12 @@
 # This file is a part of <https://github.com/kallistraw/Telegram-Bot-Assistant>
 # and is released under the "BSD-3-Clause License". Please read the full license in
 # <https://github.com/kallistraw/Telegram-Assistant-Bot/blob/main/LICENSE>
-"""This module contains convenience tools"""
+"""This module contains some convenience tools"""
 
 from io import BytesIO
+from typing import Optional
 
 from PIL import Image, ImageOps
-
-from tgbot.core import BotConfig
 
 __all__ = [
     "process_thumbnail",
@@ -18,17 +17,20 @@ __all__ = [
 
 
 def process_thumbnail(
-    input_path: str, output_path: str = BotConfig.THUMBNAIL, max_size_kb=200
-):
+    input_path: str,
+    output_path: Optional[str] = None,
+    max_size_kb: int = 200,
+) -> None:
     """
     This tool is used for compressing an image to fit within Telegram's thumbnail size limit.
 
     Arguments:
         input_path (str): The path to the image.
-        output_path (str, optional): The path which will be used to save the image.
-            Defaults to :class:`BotConfig.THUMBNAIL`.
+        output_path (str, optional): The path which will be used to save the image. Defaults to the
+            input_path.
         max_size_kb (int, optional): The size limit in KB. Defaults to ``200``.
     """
+    output_path = output_path or input_path
     img = Image.open(input_path)
     img = ImageOps.contain(img, (320, 320))
 
