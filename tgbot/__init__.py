@@ -17,12 +17,11 @@ from telegram import __version__ as __ptb__
 from telegram.constants import ParseMode
 from telegram.ext import ApplicationBuilder, Defaults, PicklePersistence
 
+from tgbot.configs import ConfigVars
 from tgbot.core import get_database
-from tgbot.core.client import Client
+from tgbot.core.application import TelegramApplication
 from tgbot.utils import LOGS
 from tgbot.version import __version__
-
-from .configs import ConfigVars
 
 __all__ = ("__ptb__", "__version__", "bot", "database", "LOGS", "Var")
 
@@ -79,9 +78,9 @@ database = get_database()
 
 bot_token = database.get("BOT_TOKEN", None) or Var.BOT_TOKEN
 log_group_id = database.get("LOG_GROUP_ID", None) or Var.LOG_GROUP_ID or None
-bot = (
+bot: TelegramApplication = (
     ApplicationBuilder()
-    .application_class(Client, kwargs={"log_group_id": log_group_id})
+    .application_class(TelegramApplication, kwargs={"log_group_id": log_group_id})
     .arbitrary_callback_data(2048)
     .defaults(defaults)
     .persistence(persist)

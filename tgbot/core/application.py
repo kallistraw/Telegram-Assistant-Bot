@@ -7,18 +7,18 @@
 """This module contain the telegram.ext.Application subclass."""
 
 import asyncio
+from contextlib import asynccontextmanager
 from functools import wraps
 from html import escape
 from io import BytesIO
 from logging import Logger
 from re import Pattern
-import sys
 import traceback
 from typing import Any, Callable, Collection, Optional, Union
 
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update, User
 from telegram.constants import ParseMode
-from telegram.error import InvalidToken, RetryAfter
+from telegram.error import RetryAfter
 from telegram.ext import (
     Application,
     CallbackQueryHandler,
@@ -36,50 +36,128 @@ from tgbot.utils import LOGS
 database = get_database()
 
 __all__ = [
-    "Client",
+    "TelegramApplication",
 ]
 
 Var = ConfigVars()
 
 
-class Client(Application):
+class ConversationManager:  # pylint: disable=R0903
+    """A very simple conversation manager using `asyncio.Queue()`"""
+
+    def __init__(self, chat_id: int, timeout: Optional[int] = 300) -> None:
+        self.chat_id = chat_id
+        self.queue = asyncio.Queue()
+        self.timeout = timeout
+
+    async def wait_update(self) -> Union[Update, None]:
+        """Wait for the next message with a timeout."""
+        try:
+            return await asyncio.wait_for(self.queue.get(), timeout=self.timeout)
+        except asyncio.TimeoutError:
+            return None  # Return None if the user takes too long
+
+
+class TelegramApplication(Application):
     """
     A very simple subclass of telegram.ext.Application with Pyrogram-style decorators.
     """
 
     def __init__(self, log_group_id: int, logger: Logger = LOGS, **kwargs) -> None:
         super().__init__(**kwargs)
-        self._cache: dict[str | int, Any] = {}
-        self.log_group_id = log_group_id
-        self.bot_info = None
-        self.logger = logger
+        self._convo: dict[Any, Any] = {}
+        self.log_group_id: int = log_group_id
+        self.bot_info: Optional[User] = None
+        self.logger: Logger = logger
+        self._msg_handler: Optional[MessageHandler] = None
 
-        self.logger.info("Initializing bot client...")
+        self.logger.info("Initializing Application...")
         loop = asyncio.get_event_loop()
         loop.run_until_complete(self._async_init())
         self.add_error_handler(self.error_handler)
+
+    # Copies Telethon's `TelegramClient.converation()` behavior
+    @asynccontextmanager
+    async def conversation(self, chat_id: int, timeout: Optional[int] = 300) -> None:
+        """
+        Async conversation manager with timeout.
+
+        Arguments:
+            chat_id (int): The chat ID to hold a conversation to.
+            timeout (int, optional): How long (in seconds) the bot should hold the conversation.
+                Defaults to `300` (5 minutes)
+        """
+        conv = ConversationManager(chat_id, timeout)
+        self._convo[chat_id] = conv
+
+        if not hasattr(self, "_msg_handler"):
+            self._msg_handler = MessageHandler(
+                filters.ChatType.PRIVATE, self._handle_update
+            )
+            self.add_handler(self._msg_handler)
+
+        try:
+            yield conv
+        finally:
+            del self._convo[chat_id]
+
+            # Remove handler if there's no active conversations
+            if not self._convo:
+                self.remove_handler(self._msg_handler)
+                del self._msg_handler
+
+    async def _handle_update(self, update: Update):
+        """Routes incoming updates to the correct conversation queue."""
+        chat_id = update.message.chat_id
+        if chat_id in self._convo:
+            await self._convo[chat_id].queue.put(update)
 
     async def _async_init(self) -> None:
         """
         Asynchronously initialize the bot and fetch its info.
         """
-        try:
-            await self.bot.initialize()
-        except InvalidToken:
-            self.logger.error(
-                "Your bot token is invalid/expired,"
-                "get a new one from @BotFather and put it in the .env file."
-            )
-            sys.exit(1)
+        await self.bot.initialize()
 
         self.bot_info = await self.bot.get_me()
         me = self.bot_info
         self.logger.info("Bot initialized! Username: @%s, ID: %s", me.username, me.id)
         return
 
-    def __repr__(self) -> str:
-        name = f"@{self.bot_info.username}" if self.bot_info else "Unknown"
-        return f"<Telegram.Client name: {name}>"
+    def _dynamic_filter(
+        self,
+        owner_only: bool = False,
+        admins_only: bool = False,
+        fltrs: Optional[filters.BaseFilter] = None,
+    ) -> Optional[filters.BaseFilter]:
+        """
+        Dynamically return telegram.ext.filters.MessageFilter.
+        """
+        owner = Var.OWNER_ID
+        extra_filter = fltrs
+
+        if owner_only:
+            extra_filter = (
+                (extra_filter & filters.User(owner))
+                if extra_filter
+                else filters.User(owner)
+            )
+
+        if admins_only:
+            get_admins = database.get("ADMINS", [])
+            if get_admins:
+                admins = [int(x) for x in get_admins]
+                admins.append(owner)
+                dev_filter = filters.User(admins)
+                extra_filter = (
+                    (extra_filter & dev_filter) if extra_filter else dev_filter
+                )
+            else:
+                extra_filter = (
+                    (extra_filter & filters.User(owner))
+                    if extra_filter
+                    else filters.User(owner)
+                )
+        return extra_filter
 
     async def error_handler(
         self, update: Update, context: ContextTypes.DEFAULT_TYPE
@@ -96,7 +174,7 @@ class Client(Application):
         )
         tb_str = "".join(tb_list)
         # update_str = update.to_dict() if isinstance(update, Update) else str(update)
-        text = update.message.text
+        text = update.effective_message
         chat = update.effective_chat
         user = update.effective_sender
 
@@ -108,7 +186,7 @@ class Client(Application):
             # f"<pre>{escape(json.dumps(update_str, indent=2, ensure_ascii=False))}</pre>\n\n"
         )
 
-        error_message = err + f"\n\n<pre>{escape(tb_str)}</pre>"
+        error_message = err + f"\n<pre>{escape(tb_str)}</pre>"
 
         if self.log_group_id:
             if len(error_message) > 4096:
@@ -155,42 +233,6 @@ class Client(Application):
                     error_message,
                     parse_mode=ParseMode.HTML,
                 )
-
-    def _dynamic_filter(
-        self,
-        owner_only: bool = False,
-        admins_only: bool = False,
-        fltrs: Optional[filters.BaseFilter] = None,
-    ) -> Optional[filters.BaseFilter]:
-        """
-        Dynamically return telegram.ext.filters.MessageFilter.
-        """
-        owner = Var.OWNER_ID
-        extra_filter = fltrs
-
-        if owner_only:
-            extra_filter = (
-                (extra_filter & filters.User(owner))
-                if extra_filter
-                else filters.User(owner)
-            )
-
-        if admins_only:
-            get_admins = database.get("ADMINS", [])
-            if get_admins:
-                admins = [int(x) for x in get_admins]
-                admins.append(owner)
-                dev_filter = filters.User(admins)
-                extra_filter = (
-                    (extra_filter & dev_filter) if extra_filter else dev_filter
-                )
-            else:
-                extra_filter = (
-                    (extra_filter & filters.User(owner))
-                    if extra_filter
-                    else filters.User(owner)
-                )
-        return extra_filter
 
     def on_command(
         self,
@@ -239,9 +281,6 @@ class Client(Application):
                 owner = Var.OWNER_ID
                 user = update.message.from_user
                 is_group = update.message.chat.type in ["group", "supergroup"]
-                self.logger.info(
-                    f"Received command: {update.message.text} from {update.message.from_user.id}"
-                )
 
                 if owner_only and user.id != owner:
                     await update.message.reply_text(
@@ -290,7 +329,6 @@ class Client(Application):
 
                 return await func(update, context, *args, **kwargs)
 
-            self.logger.info(f"Registering command: {func}")
             self.add_handler(
                 PrefixHandler(prefixes, commands, callback=wrapper, filters=fltrs),
                 group=0,
@@ -327,7 +365,6 @@ class Client(Application):
             ):
                 return await func(update, context, *args, **kwargs)
 
-            self.logger.info(f"Registering message handler: {func}")
             self.add_handler(
                 MessageHandler(callback=wrapper, filters=extra_filter), group=1
             )
@@ -347,7 +384,6 @@ class Client(Application):
             ):
                 return await func(update, context, *args, **kwargs)
 
-            self.logger.info(f"Registering inline query handler: {func}")
             self.add_handler(InlineQueryHandler(callback=wrapper))
             return wrapper
 
@@ -375,7 +411,6 @@ class Client(Application):
             ):
                 return await func(update, context, *args, **kwargs)
 
-            self.logger.info(f"Registering callback: {func}")
             self.add_handler(CallbackQueryHandler(callback=wrapper, pattern=pattern))
             return wrapper
 
