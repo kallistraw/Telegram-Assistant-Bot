@@ -45,7 +45,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     )
 
 
-@bot.on_callback()
+@bot.on_callback(pattern="help")
 async def start_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handles help button callbacks"""
     query = update.callback_query
