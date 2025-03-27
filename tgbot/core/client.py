@@ -4,7 +4,7 @@
 # This file is a part of <https://github.com/kallistraw/Telegram-Bot-Assistant>
 # and is released under the "BSD-3-Clause License". Please read the full license in
 # <https://github.com/kallistraw/Telegram-Assistant-Bot/blob/main/LICENSE>
-"""This module contain the :class:`telegram.ext.Application` subclass."""
+"""This module contain the telegram.ext.Application subclass."""
 
 import asyncio
 from functools import wraps
@@ -44,7 +44,7 @@ Var = ConfigVars()
 
 class Client(Application):
     """
-    A very simple subclass of `telegram.ext.Application` with Pyrogram-style decorators.
+    A very simple subclass of telegram.ext.Application with Pyrogram-style decorators.
     """
 
     def __init__(self, log_group_id: int, logger: Logger = LOGS, **kwargs) -> None:
@@ -97,13 +97,13 @@ class Client(Application):
         tb_str = "".join(tb_list)
         # update_str = update.to_dict() if isinstance(update, Update) else str(update)
         text = update.message.text
-        chat = update.message.chat
-        user = update.message.from_user
+        chat = update.effective_chat
+        user = update.effective_sender
 
         err = (
             "⚠️ <b>An error Occurred</b>\n\n"
-            f"<b>Chat:</b> <code>{escape(chat.title)} (chat.id)</code>\n"
-            f"<b>From user:</b> <a href='tg://user?id={user.id}'>{escape(user.first_name)}</a>\n"
+            f"<b>Chat:</b> <code>{escape(chat.effective_name)} (chat.id)</code>\n"
+            f"<b>From user:</b> {user.mention_html()}\n"
             f"<b>Message:</b> <code>{escape(text)}</code>\n"
             # f"<pre>{escape(json.dumps(update_str, indent=2, ensure_ascii=False))}</pre>\n\n"
         )
@@ -163,7 +163,7 @@ class Client(Application):
         fltrs: Optional[filters.BaseFilter] = None,
     ) -> Optional[filters.BaseFilter]:
         """
-        Dynamically return :obj:`telegram.ext.filters.MessageFilter`.
+        Dynamically return telegram.ext.filters.MessageFilter.
         """
         owner = Var.OWNER_ID
         extra_filter = fltrs
@@ -195,32 +195,29 @@ class Client(Application):
     def on_command(
         self,
         commands: Union[str, Collection[str]],
-        prefixes: Optional[Union[str, Collection[str]]],
+        prefixes: Optional[Union[str, Collection[str]]] = None,
         **kwargs,
     ) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
         """
         Decorator for handling commands.
-        For more information, read the official :class:`telegram.ext.PrefixHandler` documentation.
+        For more information, read the official telegram.ext.PrefixHandler documentation.
 
         Arguments:
-            commands (:obj:`str` | Collection[:obj:`str`]): Command names
-                (e.g., ``'start'`` or ``['ping', 'p']``).
-            prefixes (:obj:`str` | Collection[:obj:`str`], optional): Allowed prefixes
-                (e.g., ``'/'`` or ``['/', '!']``). Defaults to the value of ``PREFIXES`` in the
-                database or in `.env` file. If not present in the database or `.env` file, will
-                use `'/'`.
+            commands (str | Collection[str]): Command names
+                (e.g., 'start' or ['ping', 'p']).
+            prefixes (str | Collection[str], optional): Allowed prefixes (e.g., '/' or ['/', '!']).
+                Defaults to the value of PREFIXES in the database or in .env file. If not present
+                in the database or .env file, will use '/'.
 
         Keyword arguments:
-            owner_only (:obj:`bool`, optional): Whether the command should only work for the bot's
-                owner. Defaults to ``False``.
-            admins_only (:obj:`bool`, optional): Whether the command should only work for the bot's
-                owner and admins. Defaults to ``False``. See the `auth` command help message for
-                more details.
-            chat_type (:obj:`str`, optional): If set to `"group"` the command will only work in
-                groups. If set to `"private"`, will only work in private messages. Defaults to
-                ``None``.
-            filters (:mod:`telegram.ext.filters`, optional): Additional :mod:`telegram.ext.filters`
-                for filtering messages. Defaults to ``None``.
+            owner_only (bool, optional): Whether the command should only work for the bot's owner.
+                Defaults to False.
+            admins_only (bool, optional): Whether the command should only work for the bot's owner
+                and admins. Defaults to False. See the auth command help message for more details.
+            chat_type (str, optional): If set to "group" the command will only work in groups. If
+                set to "private", will only work in private messages. Defaults to None.
+            filters (telegram.ext.filters, optional): Additional telegram.ext.filters for filtering
+                messages. Defaults to None.
         """
         prefixes = prefixes or database.get("PREFIXES") or Var.PREFIXES
         owner_only = kwargs.get("owner_only", False)
@@ -234,7 +231,6 @@ class Client(Application):
         if "/" not in prefixes:
             prefixes.append("/")
 
-        @wraps
         def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
             @wraps(func)
             async def wrapper(
@@ -243,6 +239,9 @@ class Client(Application):
                 owner = Var.OWNER_ID
                 user = update.message.from_user
                 is_group = update.message.chat.type in ["group", "supergroup"]
+                self.logger.info(
+                    f"Received command: {update.message.text} from {update.message.from_user.id}"
+                )
 
                 if owner_only and user.id != owner:
                     await update.message.reply_text(
@@ -261,7 +260,7 @@ class Client(Application):
                         )
                         return
 
-                if chat_type.lower() == "private" and is_group:
+                if chat_type and chat_type.lower() == "private" and is_group:
                     bot_username = context.bot.username
                     command = update.message.text.split()[0]
 
@@ -283,7 +282,7 @@ class Client(Application):
                     )
                     return
 
-                if chat_type.lower() == "group" and not is_group:
+                if chat_type and chat_type.lower() == "group" and not is_group:
                     await update.message.reply_text(
                         f"Heya {escape(user.full_name)}! This command only work in group chat."
                     )
@@ -291,8 +290,10 @@ class Client(Application):
 
                 return await func(update, context, *args, **kwargs)
 
+            self.logger.info(f"Registering command: {func}")
             self.add_handler(
-                PrefixHandler(prefixes, commands, callback=wrapper, filters=fltrs)
+                PrefixHandler(prefixes, commands, callback=wrapper, filters=fltrs),
+                group=0,
             )
             return wrapper
 
@@ -305,13 +306,13 @@ class Client(Application):
         Decorator for handling messages.
 
         Keyword Arguments:
-            owner_only (:obj:`bool`, optional): Whether the handler should only work for the bot's
-                owner. Defaults to ``False``.
-            admins_only (:obj:`bool`, optional): Whether the handler should only work for the bot's
-                owner and developers. Defaults to ``False``. See the `auth` command help message
-                for more details.
-            filters (:mod:`telegram.ext.filters`, optional): Additional :mod:`telegram.ext.filters`
-                for filtering messages. Defaults to ``None``.
+            owner_only (bool, optional): Whether the handler should only work for the bot's owner.
+                Defaults to False.
+            admins_only (bool, optional): Whether the handler should only work for the bot's owner
+                and developers. Defaults to False. See the auth command help message for more \
+                details.
+            filters (telegram.ext.filters, optional): Additional telegram.ext.filters for filtering
+                messages. Defaults to None.
         """
         owner_only = kwargs.get("owner_only", False)
         admins_only = kwargs.get("admins_only", False)
@@ -319,10 +320,18 @@ class Client(Application):
 
         extra_filter = self._dynamic_filter(owner_only, admins_only, fltrs)
 
-        @wraps
         def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
-            self.add_handler(MessageHandler(callback=func, filters=extra_filter))
-            return func
+            @wraps(func)
+            async def wrapper(
+                update: Update, context: ContextTypes.DEFAULT_TYPE, *args, **kwargs
+            ):
+                return await func(update, context, *args, **kwargs)
+
+            self.logger.info(f"Registering message handler: {func}")
+            self.add_handler(
+                MessageHandler(callback=wrapper, filters=extra_filter), group=1
+            )
+            return wrapper
 
         return decorator
 
@@ -331,10 +340,16 @@ class Client(Application):
         Decorator for handling inline queries.
         """
 
-        @wraps
         def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
-            self.add_handler(InlineQueryHandler(callback=func))
-            return func
+            @wraps(func)
+            async def wrapper(
+                update: Update, context: ContextTypes.DEFAULT_TYPE, *args, **kwargs
+            ):
+                return await func(update, context, *args, **kwargs)
+
+            self.logger.info(f"Registering inline query handler: {func}")
+            self.add_handler(InlineQueryHandler(callback=wrapper))
+            return wrapper
 
         return decorator
 
@@ -348,16 +363,21 @@ class Client(Application):
         Decorator for handling button callback queries.
 
         Arguments:
-            pattern (:obj:`str` | :func:`re.Pattern <re.compile>` | :obj:`callable` | :obj:`type`,\
-             optional):
+            pattern (str | re.Pattern <re.compile> | callable | type, optional):
                 Pattern to test the callback query data against. For more information, please refer
-                to :class:`telegram.ext.CallbackQueryHandler` documentation.
+                to telegram.ext.CallbackQueryHandler documentation.
         """
 
-        @wraps
         def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
-            self.add_handler(CallbackQueryHandler(callback=func, pattern=pattern))
-            return func
+            @wraps(func)
+            async def wrapper(
+                update: Update, context: ContextTypes.DEFAULT_TYPE, *args, **kwargs
+            ):
+                return await func(update, context, *args, **kwargs)
+
+            self.logger.info(f"Registering callback: {func}")
+            self.add_handler(CallbackQueryHandler(callback=wrapper, pattern=pattern))
+            return wrapper
 
         return decorator
 

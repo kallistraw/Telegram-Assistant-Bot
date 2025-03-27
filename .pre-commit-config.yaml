@@ -43,5 +43,5 @@ repos:
         name: pylint-modules
         additional_dependencies:
           - python-telegram-bot
-        args: ["--disable=unused-import,unused-argument,broad-exception-caught"]
+        args: ["--disable=unused-import,unused-argument,broad-exception-caught,import-error"]
         files: ^modules/

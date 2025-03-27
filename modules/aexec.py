@@ -1,4 +1,3 @@
-# pylint: disable=exec-used
 """
 Execute Python code asynchronously.
 
@@ -24,7 +23,31 @@ from telegram import Update
 from telegram.ext import ContextTypes
 from telegram.helpers import mention_html
 
-from . import LOG_GROUP_ID, OWNER_ID, bot, censors, is_dangerous
+# Import all functions, classes, etc.
+# So that we don't need to import it when using the exec command.
+from . import (  # noqa: F401
+    AUTH_LIST,
+    FORUM_TOPIC,
+    LOG_GROUP_ID,
+    LOGS,
+    MAX_WARNING,
+    OWNER_ID,
+    PM_GROUP_ID,
+    BotConfig,
+    Var,
+    _bot_cache,
+    _module_cache,
+    bot,
+    bot_cache,
+    censors,
+    db,
+    get_files,
+    is_dangerous,
+    load_modules,
+    module_cache,
+    process_thumbnail,
+    safe_convert,
+)
 
 try:
     import black
@@ -57,10 +80,10 @@ async def async_exec(
     code: str, update: Update, context: ContextTypes.DEFAULT_TYPE
 ) -> Any:
     """Executes the given Python code asynchronously."""
+    # pylint: disable=W0122
     exec(
         (
             "async def _async_exec(update, context): "
-            + "\n from . import *"
             + "\n message = update.message"
             + "\n chat = update.effective_chat"
             + "\n reply = await message.reply_to_message if message.reply_to_message else None"
@@ -83,16 +106,16 @@ HEADER = (
 
 
 @bot.on_command(["exec", "py"], admins_only=True)
-async def py_eval(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+async def aexec(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Executes Python code and returns the output."""
-    # pylint: disable=too-many-locals
+    # pylint: disable=R0914
 
     # We need the raw message here to capture the `\n` which is not included in `context.args`
     try:
         cmd = update.message.text.split(maxsplit=1)[1]
     except IndexError:
         await update.message.reply_text(
-            escape("Usage: /eval <python-code>\nRead more info in /help eval")
+            escape("Usage: /exec <python-code>\nRead more info in /help exec")
         )
         return
 

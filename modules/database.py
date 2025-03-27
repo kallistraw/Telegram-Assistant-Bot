@@ -66,16 +66,16 @@ async def set_db(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
     try:
-        args = update.message.split(maxsplit=2)
+        args = update.message.text.strip().split(maxsplit=2)
     except IndexError:
         await message.edit_text(help_text)
         return
 
-    key = args[0]
-    value = args[1]
+    key = args[1]
+    value = args[2]
     text = "<b>Key-value pair stored.</b>"
 
-    if value.startswith("-e", "--extend"):
+    if value in ("-e", "--extend"):
         try:
             value = value.split(maxsplit=1)[1]
         except IndexError:
@@ -84,7 +84,7 @@ async def set_db(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         existing_value = db.get(key, None)
         if not existing_value:
-            await message.edit_text(help_text)
+            await message.edit_text(f"No such Key: <code>{escape(key)}</code>")
             return
 
         if isinstance(existing_value, list):
@@ -113,9 +113,9 @@ async def set_db(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 @bot.on_command("keys", admins_only=True)
-async def get_keys(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def get_keys(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Returns all stored keys in the database."""
-    message = update.message.reply_text(PROCESS)
+    message = await update.message.reply_text(PROCESS)
     _keys = sorted(db.keys())
     keys = "".join(
         f"\n• <code>{escape(k)}</code>"
@@ -124,4 +124,5 @@ async def get_keys(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
     text = "<b>Available keys:</b>"
-    return message.edit_text(f"{text}\n{keys}")
+    await message.edit_text(f"{text}\n{keys}")
+    return

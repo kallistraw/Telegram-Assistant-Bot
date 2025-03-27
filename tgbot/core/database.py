@@ -77,8 +77,8 @@ class SQLite:
             value of `default`.
         """
         self.cursor.execute(f"SELECT value FROM {self.table} WHERE key=?", (key,))
-        row = self.cursor.fetchone()[0]
-        return safe_convert(row) if row else default
+        row = self.cursor.fetchone()
+        return safe_convert(row[0]) if row else default
 
     def delete(self, key: str) -> None:
         """

@@ -10,7 +10,14 @@ This module contains global variables, modules cache, and commonly used imports.
 from tgbot import Var, bot, database
 from tgbot.core import BotConfig
 from tgbot.utils import LOGS, _bot_cache
-from tgbot.utils.helpers import KeepSafe, TempCache, censors, get_files, is_dangerous
+from tgbot.utils.helpers import (
+    KeepSafe,
+    TempCache,
+    censors,
+    get_files,
+    is_dangerous,
+    safe_convert,
+)
 from tgbot.utils.loader import load_modules
 from tgbot.utils.tools import process_thumbnail
 
@@ -34,6 +41,7 @@ __all__ = (
     "OWNER_ID",
     "PM_GROUP_ID",
     "process_thumbnail",
+    "safe_convert",
     "Var",
     "MAX_WARNING",
 )

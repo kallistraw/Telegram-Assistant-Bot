@@ -77,8 +77,8 @@ persist = PicklePersistence(".bot_data.pkl")
 
 database = get_database()
 
-bot_token = database.get("BOT_TOKEN") or Var.BOT_TOKEN
-log_group_id = database.get("LOG_GROUP_ID") or Var.LOG_GROUP_ID or None
+bot_token = database.get("BOT_TOKEN", None) or Var.BOT_TOKEN
+log_group_id = database.get("LOG_GROUP_ID", None) or Var.LOG_GROUP_ID or None
 bot = (
     ApplicationBuilder()
     .application_class(Client, kwargs={"log_group_id": log_group_id})
