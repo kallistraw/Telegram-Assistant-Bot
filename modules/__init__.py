@@ -74,7 +74,7 @@ if not Var.OWNER_ONLY:
 if isinstance(PREFIXES, str):
     PREFIXES = list(PREFIXES)
 
-elif isinstance(PREFIXES, list) and "/" not in PREFIXES:
+if isinstance(PREFIXES, list) and "/" not in PREFIXES:
     PREFIXES.append("/")
 
 # For caching some data to make modules work faster.
