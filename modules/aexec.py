@@ -11,12 +11,12 @@ This command could be <i>very dangerous</i> if you don't know what you're doing.
 Please do NOT use this command if you are unfamiliar with python code.
 """
 
-from html import escape
-from io import BytesIO, StringIO
 import json
 import sys
 import time
 import traceback
+from html import escape
+from io import BytesIO, StringIO
 from typing import Any
 
 from telegram import Update
@@ -41,6 +41,7 @@ from . import (  # noqa: F401
     bot_cache,
     censors,
     db,
+    format_time,
     get_files,
     is_dangerous,
     load_modules,
@@ -98,10 +99,10 @@ async def async_exec(
 
 
 HEADER = (
-    "<b>Python Eval</b> <i>({})</i>\n\n"
+    "<b>• Python Eval</b> <i>(in {})</i>\n"
     "<pre><code class='language-python'>\n"
     "{}</code></pre>\n\n"
-    "<b>Output:</b>"
+    "<b>• Output:</b>"
 )
 
 
@@ -165,13 +166,8 @@ async def aexec(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         or "Success"
     )
 
-    if elapsed_time < 1:
-        time_str = f"{elapsed_time * 1000:.4f} ms"
-    else:
-        time_str = f"{elapsed_time:.2f} sec"
-
     final_message = (
-        HEADER.format(escape(time_str), escape(cmd))
+        HEADER.format(format_time(elapsed_time), escape(cmd))
         + f"\n<pre>{censors(escape(output))}</pre>"
     )
 
@@ -180,7 +176,8 @@ async def aexec(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         with BytesIO(output.encode()) as file:
             file.name = "output.txt"
             await update.message.reply_document(
-                document=file, caption=HEADER.format(escape(time_str), escape(cmd))
+                document=file,
+                caption=HEADER.format(format_time(elapsed_time), escape(cmd)),
             )
         return
 

@@ -24,6 +24,67 @@ __all__ = (
 
 
 # ----------------------------------------------------------------------------------------------- #
+# Formatter
+
+
+def format_time(value: float, precision: int = 2) -> str:
+    """
+    Convert a time duration into a human-readable format with multiple units.
+
+    Arguments:
+        value(float): The time value in seconds.
+        precision(int): Number of decimal places for sub-second values.
+    Returns:
+        (str): Formatted time string like "1d 14h 6m".
+    """
+    units = [
+        (31540000, "years"),  # years (approx 365.25 days)
+        (2.628e6, "months"),  # months (approx 30.44 days)
+        (604800, "weeks"),  # weeks
+        (86400, "d"),  # days
+        (3600, "h"),  # hours
+        (60, "m"),  # minutes
+        (1, "s"),  # seconds
+    ]
+
+    subsecond_units = [
+        (1e-3, "ms"),  # milliseconds
+        (1e-6, "µs"),  # microseconds
+        (1e-9, "ns"),  # nanoseconds
+    ]
+
+    # Handle sub-second values separately
+    if value < 1:
+        for factor, suffix in subsecond_units:
+            if value >= factor:
+                return f"{value / factor:.{precision}f}{suffix}"
+        return f"{value:.{precision}f}s"  # Default to seconds if too small
+
+    # Convert larger values
+    parts = []
+    for factor, suffix in units:
+        if value >= factor:
+            count = int(value // factor)
+            value %= factor
+            parts.append(f"{count}{suffix}")
+
+    return " ".join(parts)
+
+
+def format_size(size_bytes):
+    """Convert a byte size into a human-readable format."""
+    if size_bytes == 0:
+        return "0B"
+
+    size_units = ["B", "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB"]
+    i = 0
+    while size_bytes >= 1024 and i < len(size_units) - 1:
+        size_bytes /= 1024.0
+        i += 1
+    return f"{size_bytes:.2f} {size_units[i]}"
+
+
+# ----------------------------------------------------------------------------------------------- #
 # Handling data types for storing it from Telegram to database
 
 
@@ -31,23 +92,19 @@ def safe_convert(value: str) -> Union[list, dict, int, float, bool, str]:
     """
     Converts a string into the correct Python data type.
 
-    Handles int, float, list, dict, and bool` safely.
+    Handles int, float, list, dict, and bool safely.
     Useful for handling Telegram message.
 
     Arguments:
         value (str): The string to be converted.
 
     Returns:
-        int: If the value is a number.
-        float: If the value is a float.
-        list: If the value is a Python list.
-        dict: If the value is a Python dictionary.
-        bool: If the value is a Boolean.
-        str: If the value is none of the above.
+        (int | float | list | dict | bool | str): The converted value, or the value itself if the
+            conversion could not find the expected type.
     """
     value = value.strip()
 
-    # Try to parse JSON (for lists/dicts)
+    # Try to parse JSON first
     try:
         return json.loads(value)
     except (json.JSONDecodeError, TypeError):
@@ -58,10 +115,6 @@ def safe_convert(value: str) -> Union[list, dict, int, float, bool, str]:
         return ast.literal_eval(value)
     except (ValueError, SyntaxError):
         pass
-
-    # Check for boolean values
-    if value.lower() in ("true", "false"):
-        return value.lower() == "true"
 
     # Try parsing as a number
     try:
@@ -83,10 +136,6 @@ class TempCache:
     def __init__(self, cache_dict: Optional[dict]) -> None:
         """
         Initialize with an external dictionary (or create a new one if None).
-
-        Arguments:
-            cache_dict (dict, optional):
-                The dictionary to use as a temporary cache storage.
         """
         self.cache = cache_dict if cache_dict is not None else {}
 
@@ -200,7 +249,7 @@ class TempCache:
     @property
     def tuple(self):
         class TupleWrapper:
-            """Handling tuples."""
+            """Handling tuples."""  # Hehe(3)^_^
 
             def __init__(self, parent):
                 self.parent = parent
@@ -246,34 +295,14 @@ def get_files(
     """
     Fetch all files with the given extension(s) from the specified directory.
 
-    Example:
-    .. code-block:: python
-
-        directory_path = "/path/to/directory"
-
-        # Get all Python files inside 'directory_path'
-        py_files = get_files(directory_path, ".py")
-        print(f"Found {len(py_files)} Python files:\n" + "\n".join(py_files)
-
-        # Get all Python and Ruby files from 'directory_path'
-        py_rb_files = get_files(directory_path, [".py", ".rb"])
-        print(f"Found {len(py_rb_files)} Python and Ruby files:\n" + "\n".join(py_files)
-
-        # Get all TXT files recursively
-        txt_files = get_files(directory_path, ".txt", recursive=True)
-        print(f"Found {len(txt_files)} TXT files:\n" + "\n".join(txt_files))
-
     Arguments:
-        directory (str):
-            The path to directory.
-        extensions (str` or list` of str):
-            The extension(s) of the files.
-        recursive (bool, optional):
-            If set to ``True`, will search files recursively. Defaults to ``False``
+        directory (str): The path to directory.
+        extensions (str or list of str): The extension(s) of the files.
+        recursive (bool, optional): If set to `True`, will search files recursively. Defaults
+            to `False`
 
     Returns:
-        files (list):
-            Àll file that ends with :param:`extensions`.
+        files (list): Àll file that ends with `extensions` inside `directory`.
     """
     if not os.path.isdir(directory):
         raise ValueError(f"Invalid directory: {directory}")
@@ -302,7 +331,7 @@ def get_files(
 # If you don't know or you're not sure what you're doing,
 # It's best to NOT touch this thing below.
 # This is for YOUR safety, preventing accidental dangerous operations,
-# and preventing trolls from ruining your system.
+# and preventing trolls from ruining your OS.
 
 # inspired by:
 # https://github.com/Danish-00
@@ -313,27 +342,21 @@ class KeepSafe:  # pylint: disable=C0115
         self._data = MappingProxyType(
             {
                 "All": (
-                    "run_shell",
                     "BOT_TOKEN",
-                    "DeleteAccountRequest",
                     "base64",
-                    "bash",
+                    "async_exec",
                     "call_back",
                     "get_me",
-                    'get_entity("me")',
-                    "get_entity('me')",
                     "exec",
                     "os.system",
+                    "from os import",
                     "subprocess",
                     "await locals()",
                     "await globals()",
-                    "async_eval",
-                    ".session.save()",
-                    ".auth_key.key",
                     "KeepSafe",
                     ".flushall",
                     ".env",
-                    "DEVS",
+                    "ADMINS",
                     "rm -rf",
                     "shutdown",
                     "reboot",
@@ -341,10 +364,14 @@ class KeepSafe:  # pylint: disable=C0115
                     "poweroff",
                     "mkfs",
                     "dd",
+                    "sys.exit",
+                    "from sys import",
                     ":(){ :|: & };:",
                 ),
                 "Keys": (
                     "bot_token",
+                    "mongo_uri",
+                    "database_url",
                     "api_id",
                     "api_hash",
                 ),
@@ -356,16 +383,13 @@ class KeepSafe:  # pylint: disable=C0115
     __class__ = type
 
     def __dir__(self) -> list:
-        return ["get"]
+        return []
 
     def __repr__(self) -> str:
-        return "<built-in function KeepSafe>"
+        return f"<built-in function {self.__class__.__name__}"
 
     def __call__(self) -> str:
-        raise TypeError("KeepSafe object is not callable")
-
-    def __str__(self) -> str:
-        return "<built-in function KeepSafe>"
+        raise TypeError(f"{self.__class__.__name__} object is not callable")
 
     def get(self) -> str:
         return self._data
@@ -373,19 +397,19 @@ class KeepSafe:  # pylint: disable=C0115
 
 def is_dangerous(cmd: str) -> bool:
     """
-    Determine wheter an operation is considered dangerous or not.
+    Determine whether a code or shell command is considered dangerous or not.
 
     Arguments:
-        cmd (str): The string of the operation.
+        cmd (str): The code or shell command.
 
     Returns:
-        bool: ``True`` if it's dangerous.
+        bool: `True` if it's dangerous.
     """
     return any(d in cmd for d in KeepSafe().get()["All"])
 
 
 def censors(text: str) -> str:
-    """Censors sensitive information from output."""
+    """Censors sensitive information."""
     if not text:
         return text
 

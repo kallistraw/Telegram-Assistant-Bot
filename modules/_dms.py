@@ -192,7 +192,7 @@ async def forward_to_owner(
     warn_per_max = f"{warning_count}/{MAX_WARNING}"
     mention_user = mention_html(user.id, user.full_name)
 
-    is_blocked = context.bot_data.get(f"blocked_{user.id}")
+    is_blocked = context.bot_data.get(f"BLOCKED_{user.id}")
     if is_blocked:
         await update.message.reply_text(
             f"Opsie, looks like you was blocked from texting {_owner}.\n"

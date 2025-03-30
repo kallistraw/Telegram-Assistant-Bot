@@ -13,6 +13,7 @@ from telegram import Update
 
 from tgbot import StartTime, bot, database
 from tgbot.utils import LOGS
+from tgbot.utils.helpers import format_time
 from tgbot.utils.loader import load_modules
 
 _SUCCESS = """
@@ -39,7 +40,7 @@ def main():
     if not _no_log:
         pass
 
-    _time_taken = f"Bot started in {time.time() - StartTime * 1000}"
+    _time_taken = f"Bot started in {format_time(time.time() - StartTime)}"
     LOGS.info(_time_taken)
     LOGS.info(_SUCCESS)
     bot.run_polling(allowed_updates=Update.ALL_TYPES)

@@ -186,7 +186,7 @@ class TelegramApplication(Application):
         commands: Union[str, Collection[str]],
         prefixes: Optional[Union[str, Collection[str]]] = None,
         **kwargs,
-    ) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
+    ) -> Callable[[Callable[..., Any]], Optional[Callable[..., Any]]]:
         """
         Decorator for handling commands.
         For more information, read the official telegram.ext.PrefixHandler documentation.
@@ -220,31 +220,25 @@ class TelegramApplication(Application):
         if "/" not in prefixes:
             prefixes.append("/")
 
-        def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
+        def decorator(func: Callable[..., Any]) -> Optional[Callable[..., Any]]:
             @wraps(func)
             async def wrapper(
                 update: Update, context: ContextTypes.DEFAULT_TYPE, *args, **kwargs
             ):
                 owner = Var.OWNER_ID
-                user = update.message.from_user
-                is_group = update.message.chat.type in ["group", "supergroup"]
+                user = update.effective_user
+                is_group = update.effective_chat.type in ["group", "supergroup"]
+                auth_list = list(owner)
+                admins = database.get("ADMINS", [])
+                auth_list.extend(int(x) for x in admins)
 
-                if owner_only and user.id != owner:
+                if (owner_only or admins_only) and (
+                    user is None or user.id not in auth_list
+                ):
                     await update.message.reply_text(
                         "You are not authorized to use this command."
                     )
                     return
-
-                if admins_only:
-                    get_admins = database.get("ADMINS") or []
-                    admins = [int(x) for x in get_admins]
-                    admins.append(owner)
-
-                    if user.id not in admins:
-                        await update.message.reply_text(
-                            "You are not authorized to use this command"
-                        )
-                        return
 
                 if chat_type and chat_type.lower() == "private" and is_group:
                     bot_username = context.bot.username
@@ -262,7 +256,7 @@ class TelegramApplication(Application):
                     name = escape(user.full_name)
 
                     await update.message.reply_text(
-                        f"Heya {name}! This command only work in private chat."
+                        f"Heya {name}! This command only work in a private chat."
                         "\nClick the button bellow to use this command.",
                         reply_markup=reply_markup,
                     )
@@ -270,7 +264,7 @@ class TelegramApplication(Application):
 
                 if chat_type and chat_type.lower() == "group" and not is_group:
                     await update.message.reply_text(
-                        f"Heya {escape(user.full_name)}! This command only work in group chat."
+                        f"Heya {escape(user.full_name)}! This command only work in a group chat."
                     )
                     return
 
@@ -294,8 +288,7 @@ class TelegramApplication(Application):
             owner_only (bool, optional): Whether the handler should only work for the bot's owner.
                 Defaults to False.
             admins_only (bool, optional): Whether the handler should only work for the bot's owner
-                and developers. Defaults to False. See the auth command help message for more \
-                details.
+                and admins. Defaults to False. See the auth command help message for more details.
             filters (telegram.ext.filters, optional): Additional telegram.ext.filters for filtering
                 messages. Defaults to None.
         """
@@ -341,7 +334,9 @@ class TelegramApplication(Application):
         pattern: Optional[
             Union[str, Pattern[str], type, Callable[[object], Optional[bool]]]
         ] = None,
-    ) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
+        owner_only: bool = False,
+        admins_only: bool = False,
+    ) -> Optional[Callable[[Callable[..., Any]], Callable[..., Any]]]:
         """
         Decorator for handling button callback queries.
 
@@ -349,6 +344,10 @@ class TelegramApplication(Application):
             pattern (str | re.Pattern <re.compile> | callable | type, optional):
                 Pattern to test the callback query data against. For more information, please refer
                 to telegram.ext.CallbackQueryHandler documentation.
+            owner_only (bool, optional): Whether the callback should only work for the bot's owner.
+                Defaults to ``False``.
+            admins_only (bool, optional): Whether the callback should only work for the bot's owner
+                and admins. Defaults to ``False``.
         """
 
         def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
@@ -356,6 +355,19 @@ class TelegramApplication(Application):
             async def wrapper(
                 update: Update, context: ContextTypes.DEFAULT_TYPE, *args, **kwargs
             ):
+                user = update.effective_user
+                owner = Var.OWNER_ID
+                auth_list = list(owner)
+                auth_list.extend(x for x in database.get("ADMINS", []))
+
+                if (owner_only or admins_only) and (
+                    user is None or user.id not in auth_list
+                ):
+                    await update.callback_query.answer(
+                        "You are not authorized.", show_alert=True
+                    )
+                    return
+
                 return await func(update, context, *args, **kwargs)
 
             self.add_handler(CallbackQueryHandler(callback=wrapper, pattern=pattern))

@@ -50,8 +50,8 @@ async def get_db(update: Update, context: ContextTypes.DEFAULT_TYPE):
     value = db.get(context.args[0], None)
     text = (
         f"<b>SQLite</b>\n"
-        f"<b>Key:</b> <code>{escape(context.args[0])}</code>\n"
-        f"<b>Value:</b> <code>{escape(value)}</code>"
+        f"<b>• Key:</b> <code>{escape(context.args[0])}</code>\n"
+        f"<b>• Value:</b> <code>{escape(value)}</code>"
     )
 
     await message.edit_text(text)
@@ -82,7 +82,7 @@ async def set_db(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await message.edit_text(help_text)
             return
 
-        existing_value = db.get(key, None)
+        existing_value = db.fetchone(key, None)
         if not existing_value:
             await message.edit_text(f"No such Key: <code>{escape(key)}</code>")
             return
@@ -116,7 +116,7 @@ async def set_db(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def get_keys(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Returns all stored keys in the database."""
     message = await update.message.reply_text(PROCESS)
-    _keys = sorted(db.keys())
+    _keys = sorted(db.fetchall(pattern="key"))
     keys = "".join(
         f"\n• <code>{escape(k)}</code>"
         for k in _keys

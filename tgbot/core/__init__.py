@@ -6,11 +6,12 @@
 # <https://github.com/kallistraw/Telegram-Assistant-Bot/blob/main/LICENSE>
 """This module contains the core functions of the bot."""
 
-from enum import Enum
 from os import path
 
-from tgbot.core.database import SQLite
-from tgbot.utils import LOGS
+from telegram._utils.enum import StringEnum
+
+from tgbot.configs import ConfigVars as Var
+from tgbot.core.database import MongoDB, PostgreSQL, SQLite
 
 __all__ = ("BotConfig", "get_database")
 
@@ -27,22 +28,23 @@ def get_database():
     """Returns the database instance."""
     global _DB_INSTANCE  # pylint: disable=W0603
     if _DB_INSTANCE is None:
-        _DB_INSTANCE = SQLite(logger=LOGS)
+        if Var.DATABASE_URL:
+            _DB_INSTANCE = PostgreSQL(Var.DATABASE_URL)
+        elif Var.MONGO_URI:
+            _DB_INSTANCE = MongoDB(Var.MONGO_URI)
+        else:
+            _DB_INSTANCE = SQLite()
         return _DB_INSTANCE
     return _DB_INSTANCE
 
 
 # Do NOT overwrite the attribute names
-class BotConfig(Enum):
+class BotConfig(StringEnum):  # pylint: disable=E0244
     """
     This enum contains the bot's global configuration.
     """
 
-    # You should not edit the configuration defined below.
-    # You can configure the bot within the bot itself.
-    # See the `settings` command help message for more information.
-
-    THUMBNAIL = path.abspath(path.join(_root, "assets/thumbnail.jpeg"))
+    THUMBNAIL: str = str(path.abspath(path.join(_root, "assets/thumbnail.jpeg")))
     """
     :obj:`str`: The path to image that will be used for a thumbnail when the bot send a documents.
 
@@ -51,6 +53,3 @@ class BotConfig(Enum):
         JPEG formats and less than 200 KiB in size. The thumbnail's height and width should not
         exceed 320.
     """
-
-    def __str__(self):
-        return str(self.value)  # Ensure string output

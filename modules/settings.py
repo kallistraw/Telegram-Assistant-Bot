@@ -6,6 +6,8 @@ Manage the bot's configuratuon.
   The settings home page.
 """
 
+from warnings import filterwarnings
+
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.error import TelegramError
 from telegram.ext import (
@@ -16,6 +18,7 @@ from telegram.ext import (
     filters,
 )
 from telegram.helpers import mention_html
+from telegram.warnings import PTBUserWarning
 
 from . import (
     AUTH_LIST,
@@ -27,41 +30,53 @@ from . import (
     safe_convert,
 )
 
+# Ignore a warning sent by PTB about "CallbackQueryHandler in ConversatuonHandler".
+# Read more in PTB's wiki below
+# https://github.com/python-telegram-bot/python-telegram-bot/wiki/Frequently-Asked-Questions
+filterwarnings(
+    action="ignore", message=r".*CallbackQueryHandler", category=PTBUserWarning
+)
 
+settings_keyboard = [
+    [
+        InlineKeyboardButton("Thumbnail", callback_data="set_thumbnail"),
+        InlineKeyboardButton("Prefix", callback_data="set_prefix"),
+    ],
+    [
+        InlineKeyboardButton("PM Bot Settings", callback_data="pm_home"),
+    ],
+    [
+        InlineKeyboardButton("Back To Home", callback_data="start"),
+    ],
+]
+settings_markup = InlineKeyboardMarkup(settings_keyboard)
+
+
+@bot.on_callback("settings", admins_only=True)
 @bot.on_command("settings", admins_only=True, chat_type="private")
 async def settings(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Sends the configuration options with an inline buttons."""
-    user = update.message.from_user
+    user = update.effective_user
 
-    keyboard = [
-        [
-            InlineKeyboardButton("Thumbnail", callback_data="set_thumbnail"),
-            InlineKeyboardButton("Prefix", callback_data="set_prefix"),
-        ],
-        [
-            InlineKeyboardButton("PM Bot Settings", callback_data="pm_home"),
-        ],
-        [
-            InlineKeyboardButton("Bot's Statistics", callback_data="bot_stats"),
-        ],
-        [
-            InlineKeyboardButton("Back To Home", callback_data="start"),
-        ],
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-
-    await update.message.reply_text(
+    msg = (
         f"Heya {mention_html(user.id, user.full_name)}!\n"
         "From here, you can change the settings as you like.\n"
-        "Click on the buttons to see more information.",
-        reply_markup=reply_markup,
+        "Click on the buttons to see more information."
     )
+
+    if hasattr(update, "callback_query"):
+        query = update.callback_query
+        await query.answer()
+        await query.edit_message_text(msg, reply_markup=settings_markup)
+        return
+
+    await update.message.reply_text(msg, reply_markup=settings_markup)
     return
 
 
-@bot.on_callback(pattern=r"^pm_*")
+@bot.on_callback(pattern="^pm_*", admins_only=True)
 async def pm_menu(update: Update, context: ContextTypes) -> None:
-    """Handles PM settings button clicks"""
+    """Sends PM bot configuration options with an inline buttons."""
     query = update.callback_query
     await query.answer()
 
@@ -110,7 +125,7 @@ async def pm_menu(update: Update, context: ContextTypes) -> None:
     return
 
 
-# ---- Conversation Stuff ----
+# ---- Conversation Stuff ---- #
 SET_MAX_WARNING, SET_PM_GROUP, SET_FORCE_SUB, SET_THUMBNAIL, SET_PREFIX = range(5)
 
 
@@ -188,7 +203,7 @@ async def set_thumbnail(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
         return SET_THUMBNAIL
 
     try:
-        file = thumb.download_to_drive(BotConfig.THUMBNAIL)
+        file = await thumb.download_to_drive(BotConfig.THUMBNAIL)
         process_thumbnail(file)
         db.set("CUSTOM_THUMBNAIL", True)
         await msg.reply_text("Custom thumbnail updated.")
@@ -266,7 +281,7 @@ async def set_max_warning(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         max_warn = int(msg)
     except ValueError:
         await update.message.reply_text(
-            "Invalid input.\nPlease send the maximum warning in a form of number (e.g., 4 or 5)"
+            "Invalid input.\nPlease send the maximum warning in a form of number (i.e., 4 or 5)"
         )
         return SET_MAX_WARNING
 

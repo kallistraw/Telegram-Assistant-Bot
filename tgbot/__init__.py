@@ -7,11 +7,11 @@
 """
 This module contains global configurations, variables, and commonly used imports.
 """
-from logging import WARNING, getLogger
 import os
 import platform
 import sys
 import time
+from logging import WARNING, getLogger
 
 from telegram import __version__ as __ptb__
 from telegram.constants import ParseMode

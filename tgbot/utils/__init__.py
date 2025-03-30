@@ -6,8 +6,8 @@
 # <https://github.com/kallistraw/Telegram-Assistant-Bot/blob/main/LICENSE>
 """This module contains utility functions"""
 
-from logging import INFO, FileHandler, StreamHandler, basicConfig, getLogger
 import os
+from logging import INFO, FileHandler, StreamHandler, basicConfig, getLogger
 from typing import Any, Union
 
 __all__ = ["_bot_cache", "LOGS"]

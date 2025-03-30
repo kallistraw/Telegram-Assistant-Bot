@@ -4,18 +4,21 @@
 # This file is a part of <https://github.com/kallistraw/Telegram-Bot-Assistant>
 # and is released under the "BSD-3-Clause License". Please read the full license in
 # <https://github.com/kallistraw/Telegram-Assistant-Bot/blob/main/LICENSE>
-# pylint: disable=R0903
 """This module contains the `ConfigVars` class."""
 
 from decouple import config
 
 
-class ConfigVars:
+class ConfigVars:  # pylint: disable=R0903
     """This class is used to fetch environment variables."""
 
     # Mandatory
     BOT_TOKEN = config("BOT_TOKEN", default=None)
     OWNER_ID = config("OWNER_ID", cast=int, default=0)
+
+    # Database
+    MONGO_URI = config("MONGO_URI", default=None)
+    DATABASE_URL = config("DATABASE_URL", default=None)
 
     # Optional
     _LOG = config("LOG_GROUP_ID", default="")
